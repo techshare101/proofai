@@ -11,7 +11,15 @@ declare module 'jspdf' {
 }
 import { SummaryResult } from '../types';
 
-export function generateSummaryPDF(summary: SummaryResult): string {
+interface GeneratePDFParams {
+  summary: string;
+  location: string;
+  time: string;
+  videoUrl: string;
+  legalRelevance: string;
+}
+
+export function generateSummaryPDF(params: GeneratePDFParams): string {
   const doc = new jsPDF();
   
   // Header
@@ -24,67 +32,30 @@ export function generateSummaryPDF(summary: SummaryResult): string {
   doc.setFontSize(14);
   doc.text('Event Summary:', 10, 35);
   doc.setFontSize(12);
-  doc.text(summary.summary, 10, 45, { maxWidth: 190 });
+  doc.text(params.summary, 10, 45, { maxWidth: 190 });
 
   let yPosition = 70;
 
-  // Participants
-  if (summary.participants?.length) {
-    autoTable(doc, {
-      head: [['Involved Parties']],
-      body: summary.participants.map(p => [p]),
-      startY: yPosition
-    });
-    yPosition = (doc as any).lastAutoTable.finalY + 10;
-  }
-
-  // Key Events
-  if (summary.keyEvents?.length) {
-    autoTable(doc, {
-      head: [['Chronological Events']],
-      body: summary.keyEvents.map(e => [e]),
-      startY: yPosition
-    });
-    yPosition = (doc as any).lastAutoTable.finalY + 10;
-  }
-
-  // Context
-  if (summary.context) {
-    autoTable(doc, {
-      head: [['Contextual Information']],
-      body: [
-        ['Location', summary.context.location || 'Not specified'],
-        ['Time', summary.context.time || 'Not specified'],
-        ['Environmental Factors', summary.context.environmentalFactors || 'None noted']
-      ],
-      startY: yPosition
-    });
-    yPosition = (doc as any).lastAutoTable.finalY + 10;
-  }
-
-  // Notable Quotes
-  if (summary.notableQuotes?.length) {
-    autoTable(doc, {
-      head: [['Notable Quotes']],
-      body: summary.notableQuotes.map(q => [q]),
-      startY: yPosition
-    });
-    yPosition = (doc as any).lastAutoTable.finalY + 10;
-  }
+  // Context Information
+  autoTable(doc, {
+    head: [['Contextual Information']],
+    body: [
+      ['Location', params.location],
+      ['Time', params.time],
+      ['Video URL', params.videoUrl]
+    ],
+    startY: yPosition
+  });
+  yPosition = (doc as any).lastAutoTable.finalY + 10;
 
   // Legal Relevance
-  if (summary.reportRelevance) {
-    autoTable(doc, {
-      head: [['Report Relevance Assessment']],
-      body: [
-        ['Legal Relevance', summary.reportRelevance.legal ? 'Yes' : 'No'],
-        ['HR Relevance', summary.reportRelevance.hr ? 'Yes' : 'No'],
-        ['Safety Relevance', summary.reportRelevance.safety ? 'Yes' : 'No'],
-        ['Explanation', summary.reportRelevance.explanation]
-      ],
-      startY: yPosition
-    });
-  }
+  autoTable(doc, {
+    head: [['Legal Assessment']],
+    body: [
+      ['Legal Relevance', params.legalRelevance]
+    ],
+    startY: yPosition
+  });
 
   // Footer
   const pageCount = doc.getNumberOfPages();
