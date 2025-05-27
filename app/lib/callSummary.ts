@@ -17,7 +17,12 @@ export async function callSummary(prompt: string) {
     }
 
     const data = await res.json();
-    return data.summary || "No summary returned.";
+    const summary = data.summary;
+  if (!summary || summary.includes("I lack the ability")) {
+    // handle error or skip PDF
+    return null;
+  }
+  return summary;
   } catch (error) {
     console.error('Summary function error:', error);
     throw error;
