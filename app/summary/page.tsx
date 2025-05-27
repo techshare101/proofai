@@ -15,6 +15,32 @@ export default function SummaryPage() {
   const [summary, setSummary] = useState<SummaryResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [userLocation, setUserLocation] = useState('Brooklyn, NY');
+
+  // Get user's location when component mounts
+  useEffect(() => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const apiKey = process.env.NEXT_PUBLIC_OPENCAGE_API_KEY;
+            const response = await fetch(
+              `https://api.opencagedata.com/geocode/v1/json?q=${position.coords.latitude}+${position.coords.longitude}&key=${apiKey}`
+            );
+            const data = await response.json();
+            if (data.results?.[0]?.formatted) {
+              setUserLocation(data.results[0].formatted);
+            }
+          } catch (err) {
+            console.error('Error getting location name:', err);
+          }
+        },
+        (err) => {
+          console.error('Geolocation error:', err);
+        }
+      );
+    }
+  }, []);
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -88,7 +114,7 @@ export default function SummaryPage() {
               }
               generateSummaryPDF({
                 summary: summary.summary,
-                location: summary.context?.location || 'Brooklyn, NY',
+                location: summary.context?.location || userLocation,
                 time: summary.context?.time || new Date().toLocaleString(),
                 videoUrl: videoUrl || '',
                 legalRelevance: summary.reportRelevance?.explanation || 'Potential workplace incident',
