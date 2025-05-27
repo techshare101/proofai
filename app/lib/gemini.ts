@@ -1,38 +1,11 @@
 import type { SummaryResult } from '../types';
+import { callSummary } from './callSummary';
 
 export async function generateSummary(prompt: string) {
-  const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-  if (!apiKey) throw new Error('Gemini API key is missing');
-
   console.log('🧠 Sending prompt to Gemini:', prompt);
 
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: prompt
-              }
-            ]
-          }
-        ]
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Gemini API Error:', response.status, errorText);
-      throw new Error(`Gemini API request failed: ${errorText}`);
-    }
-
-    const result = await response.json();
-    const summary = result.candidates?.[0]?.content?.parts?.[0]?.text ?? 'No summary returned.';
+    const summary = await callSummary(prompt);
     console.log('✅ Gemini Summary:', summary);
     return summary;
   } catch (err) {
@@ -60,20 +33,25 @@ export async function generateVideoSummary(videoUrl: string, transcript?: string
     const summary = await generateSummary(prompt);
 
     return {
-      success: true,
       summary,
+      participants: [],
+      keyEvents: [],
+      context: {
+        location: '',
+        time: '',
+        environmentalFactors: ''
+      },
+      notableQuotes: [],
+      legallyRelevantDetails: [],
+      reportRelevance: {
+        legal: false,
+        hr: false,
+        safety: false,
+        explanation: ''
+      }
     };
   } catch (error) {
     console.error('Failed to generate summary:', error);
-    if (error instanceof Error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
-    return {
-      success: false,
-      error: 'An unknown error occurred',
-    };
+    throw error instanceof Error ? error : new Error('An unknown error occurred');
   }
 }

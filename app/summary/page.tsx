@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { GeminiAPI } from '../lib/gemini';
+import { generateVideoSummary } from '../lib/gemini';
 import type { SummaryResult } from '../types';
 import SummaryCard from '../components/SummaryCard';
 import { supabase } from '../lib/supabase';
@@ -30,8 +30,7 @@ export default function SummaryPage() {
       console.log('🔍 Analyzing video:', videoUrl);
       
       try {
-        const gemini = new GeminiAPI();
-        const result = await gemini.generateSummary(videoUrl);
+        const result = await generateVideoSummary(videoUrl);
         
         if (!result) {
           throw new Error('Failed to generate summary');

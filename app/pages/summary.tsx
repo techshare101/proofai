@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import SummaryCard from '../components/SummaryCard';
-import { GeminiAPI, SummaryResult } from '../lib/gemini';
-
-const gemini = new GeminiAPI();
+import { generateVideoSummary } from '../lib/gemini';
+import type { SummaryResult } from '../types';
 
 const SummaryPage: React.FC = () => {
   const router = useRouter();
@@ -18,7 +17,7 @@ const SummaryPage: React.FC = () => {
 
       try {
         setIsLoading(true);
-        const result = await gemini.generateSummary(videoUrl);
+        const result = await generateVideoSummary(videoUrl);
         setSummary(result);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to generate summary');
@@ -43,10 +42,22 @@ const SummaryPage: React.FC = () => {
       ) : (
         <SummaryCard
           result={{
-            summary: '',
-            keywords: [],
-            keyPoints: [],
-            suggestedTitle: ''
+            summary: 'Loading...',
+            participants: [],
+            keyEvents: [],
+            context: {
+              location: '',
+              time: '',
+              environmentalFactors: ''
+            },
+            notableQuotes: [],
+            legallyRelevantDetails: [],
+            reportRelevance: {
+              legal: false,
+              hr: false,
+              safety: false,
+              explanation: ''
+            }
           }}
           isLoading={true}
         />
