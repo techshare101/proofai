@@ -110,10 +110,14 @@ export default function SummaryPage() {
                 console.error('No valid summary available');
                 return;
               }
+              if (!summary.summary) {
+                console.error('No valid summary available');
+                return;
+              }
               generateSummaryPDF({
-                summary: summary.summary,
-                location: summary.context?.location || userLocation,
-                time: summary.context?.time || new Date().toLocaleString(),
+                summary: summary.summary, // must not be empty
+                location: userLocation, // confirmed from geolocation or fallback
+                time: new Date().toLocaleString(),
                 videoUrl: videoUrl || '',
                 legalRelevance: summary.reportRelevance?.explanation || 'Potential workplace incident',
               });
