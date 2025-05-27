@@ -81,13 +81,19 @@ export default function SummaryPage() {
           <SummaryCard result={summary} isLoading={false} />
           <button
             className="mt-6 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
-            onClick={() => generateSummaryPDF({
-              summary: summary.summary,
-              location: summary.context?.location || 'Brooklyn, NY',
-              time: summary.context?.time || new Date().toLocaleString(),
-              videoUrl: videoUrl || '',
-              legalRelevance: summary.reportRelevance?.explanation || 'Potential workplace incident',
-            })}
+            onClick={() => {
+              if (!summary?.summary) {
+                console.error('No valid summary available');
+                return;
+              }
+              generateSummaryPDF({
+                summary: summary.summary,
+                location: summary.context?.location || 'Brooklyn, NY',
+                time: summary.context?.time || new Date().toLocaleString(),
+                videoUrl: videoUrl || '',
+                legalRelevance: summary.reportRelevance?.explanation || 'Potential workplace incident',
+              });
+            }}
           >
             📄 Download Legal Report (PDF)
           </button>

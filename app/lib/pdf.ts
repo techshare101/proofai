@@ -32,7 +32,9 @@ export function generateSummaryPDF(params: GeneratePDFParams): string {
   doc.setFontSize(14);
   doc.text('Event Summary:', 10, 35);
   doc.setFontSize(12);
-  doc.text(params.summary, 10, 45, { maxWidth: 190 });
+  // Handle potentially null/undefined summary
+  const summaryText = params.summary || 'No summary available.';
+  doc.text(summaryText, 10, 45, { maxWidth: 190 });
 
   let yPosition = 70;
 
