@@ -106,21 +106,28 @@ export default function SummaryPage() {
           <button
             className="mt-6 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
             onClick={() => {
+              // Verify we have a valid summary
               if (!summary?.summary) {
                 console.error('No valid summary available');
                 return;
               }
-              if (!summary.summary) {
-                console.error('No valid summary available');
-                return;
-              }
-              generateSummaryPDF({
+              
+              console.log('Current summary state:', summary);
+              console.log('Current location:', userLocation);
+              
+              try {
+                // Generate PDF with all required fields
+                const pdfName = generateSummaryPDF({
                 summary: summary.summary, // must not be empty
                 location: userLocation, // confirmed from geolocation or fallback
                 time: new Date().toLocaleString(),
                 videoUrl: videoUrl || '',
                 legalRelevance: summary.reportRelevance?.explanation || 'Potential workplace incident',
               });
+                console.log('PDF generated successfully:', pdfName);
+              } catch (error) {
+                console.error('Error generating PDF:', error);
+              }
             }}
           >
             📄 Download Legal Report (PDF)

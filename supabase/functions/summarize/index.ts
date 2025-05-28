@@ -24,11 +24,18 @@ serve(async (req) => {
     }
 
     console.log('🔄 Calling Gemini API...')
+    const systemPrompt = `You are a legal analysis AI. Analyze the given event and provide a clear summary of what happened. Do not try to format as JSON, just provide a clear narrative summary.`;
+
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [ { parts: [ { text: prompt } ] } ],
+        contents: [{ 
+          parts: [
+            { text: systemPrompt },
+            { text: prompt }
+          ] 
+        }],
         safetySettings: [
           { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
           { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
@@ -55,10 +62,34 @@ serve(async (req) => {
     }
 
     const data = await response.json()
-    const summary = data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
     console.log('✅ Summary generated successfully')
+    
+    if (!data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+      throw new Error('Invalid response format from Gemini API')
+    }
 
-    return new Response(JSON.stringify({ summary }), {
+    const summaryText = data.candidates[0].content.parts[0].text.trim()
+    console.log('Summary text:', summaryText)
+
+    const summaryData = {
+      summary: summaryText,
+      context: {
+        location: null,  // Will be filled by frontend geolocation
+        time: new Date().toLocaleString()
+      },
+      reportRelevance: {
+        legal: true,
+        hr: true,
+        safety: true,
+        explanation: summaryText.includes('slip') || summaryText.includes('fall') ? 
+          'Workplace safety incident involving potential slip and fall. Requires immediate documentation and risk assessment.' :
+          'Workplace incident requiring documentation and follow-up'
+      }
+    }
+    
+    console.log('Returning summary data:', summaryData)
+
+    return new Response(JSON.stringify(summaryData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
