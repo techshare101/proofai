@@ -62,31 +62,46 @@ export default function Recorder() {
 
   const initializeCamera = async () => {
     try {
-      if (!streamRef.current) {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { 
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            frameRate: { ideal: 30 }
-          }, 
-          audio: true 
-        });
+      // First check if getUserMedia is supported
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Camera access is not supported in this browser');
+      }
+
+      // Clean up any existing stream
+      cleanupStream();
+
+      // Start with basic constraints first
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: true,
+        audio: true 
+      });
         
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = async () => {
           try {
-            await videoRef.current.play();
+            await videoRef.current?.play();
           } catch (playError) {
             console.error('Error playing video:', playError);
-            setError('Failed to initialize video preview');
+            throw new Error('Failed to initialize video preview');
           }
-        }
-        setError('');
+        };
+      } else {
+        throw new Error('Video element not initialized');
       }
+      setError('');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(`Camera access denied: ${errorMessage}. Please check permissions.`);
+      if (errorMessage.includes('Permission denied') || errorMessage.includes('NotAllowedError')) {
+        setError('Camera access denied. Please allow camera access in your browser settings.');
+      } else if (errorMessage.includes('NotFoundError') || errorMessage.includes('DevicesNotFoundError')) {
+        setError('No camera found. Please connect a camera and try again.');
+      } else if (errorMessage.includes('NotReadableError') || errorMessage.includes('TrackStartError')) {
+        setError('Camera is in use by another application. Please close other apps using the camera.');
+      } else {
+        setError(`Camera error: ${errorMessage}. Please try again.`);
+      }
       console.error('Media device error:', err);
     }
   };
