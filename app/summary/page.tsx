@@ -106,43 +106,48 @@ export default function SummaryPage() {
       </div>
     );
   }
-  if (loading) return <div className="p-8 text-gray-600 animate-pulse">Summarizing...</div>;
-  if (error) return <div className="p-8 text-red-500">{error}</div>;
-  if (!summary) return <div className="p-8">No summary generated.</div>;
+
+  if (loading) {
+    return <div className="p-8 text-gray-600 animate-pulse">Summarizing...</div>;
+  }
+
+  if (error) {
+    return <div className="p-8 text-red-500">{error}</div>;
+  }
+
+  if (!summary) {
+    return <div className="p-8">No summary generated.</div>;
+  }
 
   return (
     <div className="p-4">
-      {summary && (
-        <>
-          <SummaryCard result={summary} isLoading={false} />
-          <a
-            href="#"
-            className="mt-6 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors inline-block"
-            onClick={(e) => {
-              e.preventDefault();
-              if (summary?.summary) {
-                console.log('Generating PDF with summary...');
-                try {
-                  generateSummaryPDF({
-                    summary: summary.summary,
-                    location: userLocation,
-                    time: new Date().toLocaleString(),
-                    videoUrl: videoUrl || '',
-                    legalRelevance: summary.reportRelevance?.explanation || 'Potential workplace incident',
-                  });
-                  console.log('PDF generation initiated');
-                } catch (error) {
-                  console.error('Error generating PDF:', error);
-                }
-              } else {
-                console.error('No valid summary available');
-              }
+      <SummaryCard result={summary} isLoading={false} />
+      <a
+        href="#"
+        className="mt-6 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors inline-block"
+        onClick={(e) => {
+          e.preventDefault();
+          if (summary?.summary) {
+            console.log('Generating PDF with summary...');
+            try {
+              generateSummaryPDF({
+                summary: summary.summary,
+                location: userLocation,
+                time: new Date().toLocaleString(),
+                videoUrl: videoUrl || '',
+                legalRelevance: summary.reportRelevance?.explanation || 'Potential workplace incident',
+              });
+              console.log('PDF generation initiated');
+            } catch (error) {
+              console.error('Error generating PDF:', error);
             }
-          >
-            📄 Download Legal Report (PDF)
-          </a>
-        </>
-      )}
+          } else {
+            console.error('No valid summary available');
+          }
+        }}
+      >
+        📄 Download Legal Report (PDF)
+      </a>
     </div>
   );
 }
