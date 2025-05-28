@@ -93,7 +93,19 @@ export default function SummaryPage() {
     fetchSummary();
   }, [videoUrl]);
 
-  if (!videoUrl) return <div className="p-8 text-red-600">Missing video URL</div>;
+  if (!videoUrl) {
+    return (
+      <div className="p-8 flex flex-col items-center justify-center min-h-screen">
+        <div className="text-red-600 mb-4">Missing video URL</div>
+        <a
+          href="/"
+          className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+        >
+          ← Back to Recorder
+        </a>
+      </div>
+    );
+  }
   if (loading) return <div className="p-8 text-gray-600 animate-pulse">Summarizing...</div>;
   if (error) return <div className="p-8 text-red-500">{error}</div>;
   if (!summary) return <div className="p-8">No summary generated.</div>;
