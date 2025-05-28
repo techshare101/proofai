@@ -115,33 +115,32 @@ export default function SummaryPage() {
       {summary && (
         <>
           <SummaryCard result={summary} isLoading={false} />
-          <button
-            className="mt-6 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
-            onClick={() => {
-              // Use setTimeout to ensure DOM is ready
-              setTimeout(() => {
-                if (summary?.summary) {
-                  console.log('Generating PDF with summary...');
-                  try {
-                    generateSummaryPDF({
-                      summary: summary.summary,
-                      location: userLocation,
-                      time: new Date().toLocaleString(),
-                      videoUrl: videoUrl || '',
-                      legalRelevance: summary.reportRelevance?.explanation || 'Potential workplace incident',
-                    });
-                    console.log('PDF generation initiated');
-                  } catch (error) {
-                    console.error('Error generating PDF:', error);
-                  }
-                } else {
-                  console.error('No valid summary available');
+          <a
+            href="#"
+            className="mt-6 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors inline-block"
+            onClick={(e) => {
+              e.preventDefault();
+              if (summary?.summary) {
+                console.log('Generating PDF with summary...');
+                try {
+                  generateSummaryPDF({
+                    summary: summary.summary,
+                    location: userLocation,
+                    time: new Date().toLocaleString(),
+                    videoUrl: videoUrl || '',
+                    legalRelevance: summary.reportRelevance?.explanation || 'Potential workplace incident',
+                  });
+                  console.log('PDF generation initiated');
+                } catch (error) {
+                  console.error('Error generating PDF:', error);
                 }
-              }, 1000); // 1 second delay to ensure DOM is ready
-            }}
+              } else {
+                console.error('No valid summary available');
+              }
+            }
           >
             📄 Download Legal Report (PDF)
-          </button>
+          </a>
         </>
       )}
     </div>
