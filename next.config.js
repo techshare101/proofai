@@ -2,13 +2,14 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  output: 'standalone',
   headers: async () => [
     {
       source: '/:path*',
       headers: [
         {
           key: 'Content-Security-Policy',
-          value: "default-src 'self' https://*.supabase.co; connect-src 'self' https://*.supabase.co; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; media-src 'self' blob:; img-src 'self' data: blob:;"
+          value: "default-src 'self' https://*.supabase.co https://*.opencagedata.com https://generativelanguage.googleapis.com; connect-src 'self' https://*.supabase.co https://*.opencagedata.com https://generativelanguage.googleapis.com; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; media-src 'self' blob:; img-src 'self' data: blob:;"
         }
       ]
     }
