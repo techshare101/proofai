@@ -31,6 +31,10 @@ export async function generateVideoSummary(videoUrl: string, transcript?: string
               `6. Legal relevance assessment`;
 
     const summary = await generateSummary(prompt);
+    
+    if (!summary) {
+      throw new Error('Failed to generate summary');
+    }
 
     // Parse the summary into structured data
     const lines = summary.split('\n');

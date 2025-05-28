@@ -18,10 +18,13 @@ export async function callSummary(prompt: string) {
 
     const data = await res.json();
     const summary = data.summary;
-  if (!summary || summary.includes("I lack the ability")) {
-    // handle error or skip PDF
-    return null;
-  }
+    if (!summary) {
+      throw new Error('No summary received from the API');
+    }
+
+    if (summary.includes("I lack the ability") || summary.includes("I apologize") || summary.includes("I'm sorry")) {
+      throw new Error('AI was unable to generate a summary');
+    }
   return summary;
   } catch (error) {
     console.error('Summary function error:', error);
