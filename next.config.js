@@ -13,7 +13,7 @@ const nextConfig = {
       headers: [
         {
           key: 'Content-Security-Policy',
-          value: "default-src 'self' https://*.supabase.co https://*.opencagedata.com https://generativelanguage.googleapis.com; connect-src 'self' https://*.supabase.co https://*.opencagedata.com https://generativelanguage.googleapis.com; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; media-src 'self' blob:; img-src 'self' data: blob:;"
+          value: "default-src 'self' https://*.supabase.co https://*.opencagedata.com https://generativelanguage.googleapis.com https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co https://*.opencagedata.com https://generativelanguage.googleapis.com https://cdn.jsdelivr.net; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; media-src 'self' blob:; img-src 'self' data: blob:;"
         }
       ]
     }
@@ -30,6 +30,21 @@ const nextConfig = {
         },
       },
     });
+
+    // Handle ONNX runtime
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      path: false,
+      crypto: false,
+    };
+
+    // Exclude problematic files
+    config.module.rules.push({
+      test: /onnxruntime_binding\.node$/,
+      use: 'null-loader',
+    });
+
     return config;
   },
 }

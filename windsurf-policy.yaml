@@ -1,0 +1,17 @@
+rule:
+  id: "prevent-unapproved-critical-changes"
+  label: "Require Kojo's approval before major updates"
+  scope: "global"
+  triggers:
+    - type: "pre-deploy"
+    - type: "pre-save"
+  conditions:
+    any:
+      - file.modified matches ["**/api/**", "**/utils/**", "**/pages/**"]
+      - file.deleted matches ["**/storage/**", "**/functions/**"]
+      - setting.changed is true
+  exceptions:
+    - file.modified matches ["**/README.md", "**/styles/**", "**/public/**"]
+  actions:
+    - type: "block"
+      message: "🛑 Critical update detected in core files. Approval required.\n\nUse `/approve deploy` to continue after review by Kojo."

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import SummaryCard from '../components/SummaryCard';
-import { generateVideoSummary } from '../lib/gemini';
+import { generateVideoSummary } from '../lib/summaryClient';
 import type { SummaryResult } from '../types';
 
 const SummaryPage: React.FC = () => {

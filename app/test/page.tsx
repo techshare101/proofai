@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import Recorder from '../components/Recorder';
+import LegalSummaryGenerator from '../components/LegalSummaryGenerator';
 
 export default function TestPage() {
   const [error, setError] = useState<string>();
@@ -25,7 +25,7 @@ export default function TestPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-4">Video Recorder Test</h1>
+      <h1 className="text-2xl font-bold mb-4">Legal Summary Generator Test</h1>
       
       {error ? (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
@@ -33,7 +33,10 @@ export default function TestPage() {
           <p className="text-sm">{error}</p>
         </div>
       ) : (
-        <Recorder />
+        <LegalSummaryGenerator
+          caseId="TEST-001"
+          userName="Test User"
+        />
       )}
     </div>
   );

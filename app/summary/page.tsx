@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { generateVideoSummary } from '../lib/gemini';
+import { generateVideoSummary } from '../lib/summaryClient';
 import type { SummaryResult } from '../types';
 import SummaryCard from '../components/SummaryCard';
 import { supabase } from '../lib/supabase';
@@ -42,14 +42,20 @@ export default function SummaryPage() {
 
   useEffect(() => {
     const fetchSummary = async () => {
+      // Only fetch if we don't already have a summary and have a video URL
       if (!videoUrl) {
         setLoading(false);
         return;
       }
 
+      // Prevent fetching if we already have a summary for this video
+      if (summary?.summary) {
+        console.log('✅ Summary already exists:', summary.summary.substring(0, 100) + '...');
+        return;
+      }
+
       setLoading(true);
       setError('');
-      setSummary(null);
 
       console.log('🔍 Analyzing video:', videoUrl);
       
@@ -59,9 +65,15 @@ export default function SummaryPage() {
         if (!result) {
           throw new Error('Failed to generate summary');
         }
-        
-        setSummary(result);
-        console.log('✅ Summary generated successfully');
+
+        // Validate result before setting state
+        if (result.summary?.trim()) {
+          console.log('✅ New summary generated:', result.summary.substring(0, 100) + '...');
+          setSummary(result);
+        } else {
+          console.error('❌ Generated summary is empty or invalid:', result);
+          throw new Error('Generated summary is empty or invalid');
+        }
 
         // Save summary and report relevance back to Supabase
         const { error: updateError } = await supabase
@@ -84,70 +96,112 @@ export default function SummaryPage() {
       } catch (err: any) {
         console.error('❌ Summary generation error:', err);
         setError(err instanceof Error ? err.message : 'Failed to generate summary');
-        setSummary(null);
       } finally {
         setLoading(false);
       }
     };
 
     fetchSummary();
-  }, [videoUrl]);
+  }, [videoUrl, summary]); // Add summary to deps to prevent re-fetch
 
   if (!videoUrl) {
     return (
       <div className="p-8 flex flex-col items-center justify-center min-h-screen">
-        <div className="text-red-600 mb-4">Missing video URL</div>
-        <a
-          href="/"
-          className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
-        >
-          ← Back to Recorder
-        </a>
+        <h1 className="text-2xl font-bold mb-4">No Video Selected</h1>
+        <p className="text-gray-600">Please record or select a video to generate a summary.</p>
       </div>
     );
   }
 
   if (loading) {
-    return <div className="p-8 text-gray-600 animate-pulse">Summarizing...</div>;
+    return (
+      <div className="p-8 flex flex-col items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600 mb-4"></div>
+        <p className="text-gray-600">Generating summary with OpenAI...</p>
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="p-8 text-red-500">{error}</div>;
+    return (
+      <div className="p-8 flex flex-col items-center justify-center min-h-screen">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-w-2xl w-full">
+          <h2 className="text-red-800 text-lg font-semibold mb-2">⚠️ Error Generating Summary</h2>
+          <p className="text-red-600">{error}</p>
+          <div className="mt-4 space-y-2">
+            <p className="text-red-700 text-sm">This might happen if:</p>
+            <ul className="list-disc list-inside text-red-600 text-sm">
+              <li>The video is not accessible</li>
+              <li>The video format is not supported</li>
+              <li>The video content is unclear or too complex</li>
+              <li>There are temporary API issues</li>
+            </ul>
+            <div className="flex space-x-4 mt-4">
+              <button 
+                onClick={() => {
+                  setError('');
+                  setLoading(true);
+                  fetchSummary();
+                }} 
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+              >
+                Try Again
+              </button>
+              <a 
+                href="/"
+                className="px-4 py-2 border border-red-600 text-red-600 rounded hover:bg-red-50 transition-colors"
+              >
+                Record New Video
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!summary) {
-    return <div className="p-8">No summary generated.</div>;
+    return (
+      <div className="p-8 flex flex-col items-center justify-center min-h-screen">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 max-w-2xl w-full">
+          <h2 className="text-yellow-800 text-lg font-semibold mb-2">⚠️ No Summary Available</h2>
+          <p className="text-yellow-600">We couldn't generate a summary for this video. This might happen if:</p>
+          <ul className="list-disc list-inside mt-2 text-yellow-600">
+            <li>The video is still processing</li>
+            <li>The video format is not supported</li>
+            <li>There was an error analyzing the content</li>
+          </ul>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-4 px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="p-4">
       <SummaryCard result={summary} isLoading={false} />
-      <a
-        href="#"
-        className="mt-6 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors inline-block"
-        onClick={(e) => {
-          e.preventDefault();
-          if (summary?.summary) {
-            console.log('Generating PDF with summary...');
-            try {
-              generateSummaryPDF({
-                summary: summary.summary,
-                location: userLocation,
-                time: new Date().toLocaleString(),
-                videoUrl: videoUrl || '',
-                legalRelevance: summary.reportRelevance?.explanation || 'Potential workplace incident',
-              });
-              console.log('PDF generation initiated');
-            } catch (error) {
-              console.error('Error generating PDF:', error);
-            }
-          } else {
-            console.error('No valid summary available');
-          }
-        }}
-      >
-        📄 Download Legal Report (PDF)
-      </a>
+      <div className="mt-6 space-x-4">
+        <button
+          onClick={() => {
+            if (!summary) return;
+            generateSummaryPDF({
+              summary: summary.summary || "Test summary content",
+              location: userLocation || "Unknown",
+              time: new Date().toLocaleString(),
+              videoUrl: videoUrl || "N/A",
+              legalRelevance: summary.reportRelevance?.explanation || "N/A"
+            });
+          }}
+          className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors inline-block"
+        >
+          🔽 Manually Download PDF
+        </button>
+      </div>
     </div>
   );
 }

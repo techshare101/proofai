@@ -77,21 +77,29 @@ export async function uploadRecording(blob: Blob, location = '') {
     }
     console.log('✅ Public URL generated');
 
-    // 6. Create database record
+    // 6. Calculate video duration
+    console.log('⏱ Calculating video duration...');
+    const duration = await new Promise<number>((resolve) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.onloadedmetadata = () => {
+        resolve(Math.round(video.duration));
+        URL.revokeObjectURL(video.src);
+      };
+      video.src = URL.createObjectURL(blob);
+    });
+    console.log('✅ Duration calculated:', duration, 'seconds');
+
+    // 7. Create database record
     console.log('💾 Creating database record...');
     const { error: insertError } = await supabase
       .from('recordings')
-      .insert([
-        {
-          title: `Recording ${timestamp}`,
-          storage_path: storageData.path,
-          file_url: urlData.publicUrl,
-          user_id: userId,
-          location,
-          duration: 0, // TODO: Calculate actual duration
-          transcript: ''
-        }
-      ]);
+      .insert({
+        title: `Recording ${timestamp}`,
+        storage_path: storageData.path,
+        duration,
+        transcript: null // Optional field in schema
+      });
 
     if (insertError) {
       console.warn('⚠️ Database insert failed:', insertError);
