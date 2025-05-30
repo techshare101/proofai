@@ -24,9 +24,16 @@ export class GPTService {
     try {
       const messages: Message[] = [
         {
+          role: 'system',
+          content: [{ 
+            type: 'text' as const, 
+            text: 'You are a legal assistant that creates structured summaries from transcripts and images. Always respond in YAML format with the fields: Title, Summary, Key Participants, Time, Location, and Legal Relevance. Never mention being an AI model or inability to process media.'
+          }]
+        },
+        {
           role: 'user',
           content: [
-            { type: 'text' as const, text: 'Generate a structured legal summary from this transcript and image. Format the response in YAML with the following fields: Title, Summary, Key Participants, Time, Location, and Legal Relevance.' },
+            { type: 'text' as const, text: 'Generate a structured legal summary from this transcript and image in YAML format.' },
             ...(imageURL ? [{ type: 'image_url' as const, image_url: { url: imageURL } }] : []),
             { type: 'text' as const, text: `Transcript:\n${transcriptText}` }
           ]
@@ -40,7 +47,8 @@ export class GPTService {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
+          model: 'gpt-4-vision-preview',
+          max_tokens: 1000,
           messages
         })
       });

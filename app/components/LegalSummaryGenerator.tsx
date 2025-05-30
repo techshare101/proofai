@@ -27,6 +27,7 @@ export default function LegalSummaryGenerator({ caseId, location, userName }: Ge
   const [error, setError] = useState('');
 
   const handleTranscription = (text: string) => {
+    console.log('📄 Received transcript:', text);
     setTranscriptText(text);
   };
 
@@ -44,11 +45,13 @@ export default function LegalSummaryGenerator({ caseId, location, userName }: Ge
       setIsGenerating(true);
       setError('');
       
+      console.log('📤 Sending to GPT:', transcriptText);
       const generatedSummary = await GPTService.generateLegalSummary(
         transcriptText,
         frameUrl || undefined
       );
       
+      console.log('📥 Received GPT summary:', generatedSummary);
       setSummary(generatedSummary);
     } catch (err) {
       setError('Failed to generate summary. Please try again.');
