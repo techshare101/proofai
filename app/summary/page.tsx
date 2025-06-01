@@ -40,8 +40,7 @@ export default function SummaryPage() {
     }
   }, []);
 
-  useEffect(() => {
-    const fetchSummary = async () => {
+  const fetchSummary = async () => {
       // Only fetch if we don't already have a summary and have a video URL
       if (!videoUrl) {
         setLoading(false);
@@ -75,22 +74,38 @@ export default function SummaryPage() {
           throw new Error('Generated summary is empty or invalid');
         }
 
+        // Prepare update payload - only include fields we know exist
+        const updatePayload = {
+          summary: result.summary,
+          legal_relevance: result.reportRelevance?.legal || false,
+          hr_relevance: result.reportRelevance?.hr || false
+        };
+
+        console.log('🧾 PATCH Payload:', updatePayload);
+
+        // Encode the file URL for the filter
+        const encodedFileUrl = encodeURIComponent(videoUrl);
+
         // Save summary and report relevance back to Supabase
-        const { error: updateError } = await supabase
+        const { data: updateData, error: updateError } = await supabase
           .from('recordings')
-          .update({
-            summary: result.summary,
-            legal_relevance: result.reportRelevance?.legal || false,
-            hr_relevance: result.reportRelevance?.hr || false,
-            safety_relevance: result.reportRelevance?.safety || false,
-            relevance_explanation: result.reportRelevance?.explanation || '',
-            updated_at: new Date().toISOString()
-          })
-          .eq('file_url', videoUrl);
+          .update(updatePayload)
+          .eq('file_url', videoUrl)
+          .select();
 
         if (updateError) {
           console.error('⚠️ Failed to save summary to Supabase:', updateError);
+          // Check if it's a schema error
+          if (updateError.message.includes('column') && updateError.message.includes('does not exist')) {
+            console.error('❌ Schema error detected. Please run these SQL commands in Supabase:');
+            console.error(`
+ALTER TABLE recordings ADD COLUMN IF NOT EXISTS relevance_explanation text;
+ALTER TABLE recordings ADD COLUMN IF NOT EXISTS safety_relevance boolean;
+ALTER TABLE recordings ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+`);
+          }
         } else {
+          console.log('📬 PATCH Response:', updateData);
           console.log('✅ Summary saved to Supabase');
         }
       } catch (err: any) {
@@ -101,8 +116,9 @@ export default function SummaryPage() {
       }
     };
 
+  useEffect(() => {
     fetchSummary();
-  }, [videoUrl, summary]); // Add summary to deps to prevent re-fetch
+  }, [videoUrl, summary, fetchSummary]); // Add fetchSummary to deps
 
   if (!videoUrl) {
     return (

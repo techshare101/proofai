@@ -27,15 +27,36 @@ export class GPTService {
           role: 'system',
           content: [{ 
             type: 'text' as const, 
-            text: 'You are a legal assistant that creates structured summaries from transcripts and images. Always respond in YAML format with the fields: Title, Summary, Key Participants, Time, Location, and Legal Relevance. Never mention being an AI model or inability to process media.'
+            text: `You are a legal professional analyzing video evidence. Your role is to:
+1. Extract key information from transcripts and images
+2. Create structured summaries focused on legal implications
+3. Present findings in YAML format with required fields
+4. Maintain professional tone and factual analysis
+
+If content is unclear:
+- Focus on available facts
+- Note specific missing details
+- Suggest follow-up questions
+
+Never mention AI or model capabilities - stay in role as legal analyst.`
           }]
         },
         {
           role: 'user',
           content: [
-            { type: 'text' as const, text: 'Generate a structured legal summary from this transcript and image in YAML format.' },
+            { type: 'text' as const, text: `Legal Evidence Analysis Request
+
+Evidence Type: ${imageURL ? 'Video Recording with Frame Capture' : 'Video Recording'}
+Analysis Scope: Content, Context, and Legal Implications
+Required Format: YAML with structured fields
+
+Available Evidence:
+${imageURL ? '- Visual Reference (Frame Capture)' : ''}
+- Full Transcript
+
+Please analyze the following evidence and provide a structured legal summary:` },
             ...(imageURL ? [{ type: 'image_url' as const, image_url: { url: imageURL } }] : []),
-            { type: 'text' as const, text: `Transcript:\n${transcriptText}` }
+            { type: 'text' as const, text: `Evidence Transcript:\n${transcriptText}` }
           ]
         }
       ];
@@ -49,6 +70,8 @@ export class GPTService {
         body: JSON.stringify({
           model: 'gpt-4-vision-preview',
           max_tokens: 1000,
+          temperature: 0.7,
+          response_format: { type: 'text' },
           messages
         })
       });

@@ -1,5 +1,8 @@
 // lib/uploadRecording.ts
 import { supabase } from './supabase';
+import { TranscriptionService } from '../services/transcriptionService';
+import { generateVideoSummary } from './summaryClient';
+import { generatePDF } from '../utils/generatePDF';
 
 interface UploadError extends Error {
   stage?: 'auth' | 'blob' | 'storage' | 'url' | 'database';
@@ -90,7 +93,82 @@ export async function uploadRecording(blob: Blob, location = '') {
     });
     console.log('✅ Duration calculated:', duration, 'seconds');
 
-    // 7. Create database record
+    // 7. Generate transcript
+    console.log('🎙️ Starting transcription...');
+    console.log('Audio blob:', {
+      type: blob.type,
+      size: `${(blob.size / 1024 / 1024).toFixed(2)} MB`
+    });
+    const transcriptionService = await TranscriptionService.getInstance();
+    const transcript = await transcriptionService.transcribe(blob);
+    console.log('🎙️ Whisper Transcript:', transcript);
+    if (!transcript) {
+      throw new Error('No transcript returned from Whisper');
+    }
+    console.log('✅ Transcript generated successfully');
+
+    // 8. Generate summary
+    console.log('📝 Generating summary...');
+    const summaryResult = await generateVideoSummary(urlData.publicUrl, transcript);
+    console.log('✅ Summary generated');
+
+    // 9. Generate PDF
+    console.log('📄 Generating PDF report...');
+    try {
+      // Call PDF generation API
+      console.log('📝 Calling PDF generation API...');
+      const response = await fetch('/api/generate-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          data: {
+            summary: summaryResult.summary,
+            participants: ['Witness: Kojo'],
+            keyEvents: [
+              `Recording Time: ${new Date().toLocaleString()}`,
+              'Video recording of incident',
+              ...(summaryResult.keyEvents || [])
+            ],
+            context: {
+              time: new Date().toLocaleString(),
+              location: summaryResult.context?.location || 'Unknown',
+              environmentalFactors: summaryResult.context?.environmentalFactors || 'None noted'
+            },
+            notableQuotes: [
+              '🎙️ WITNESS STATEMENT',
+              transcript || 'No transcript available'
+            ],
+            reportRelevance: summaryResult.reportRelevance || {
+              legal: false,
+              hr: true,
+              safety: false,
+              explanation: 'Workplace incident recorded for documentation.'
+            },
+            videoUrl: urlData.publicUrl
+          },
+          options: {
+            caseId: filename.split('/')[1].split('-')[0],
+            reviewedBy: 'ProofAI Whisper Bot',
+            confidential: true
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(`PDF generation failed: ${error.error}`);
+      }
+
+      const { path: pdfPath } = await response.json();
+      console.log('✅ PDF generated at:', pdfPath);
+    } catch (pdfError) {
+      console.error('❌ PDF generation failed:', pdfError);
+      if (pdfError instanceof Error) {
+        console.error('PDF error stack:', pdfError.stack);
+      }
+    }
+
+    // 10. Create database record
     console.log('💾 Creating database record...');
     const { error: insertError } = await supabase
       .from('recordings')
@@ -98,7 +176,8 @@ export async function uploadRecording(blob: Blob, location = '') {
         title: `Recording ${timestamp}`,
         storage_path: storageData.path,
         duration,
-        transcript: null // Optional field in schema
+        transcript: transcript,
+        summary: summaryResult.summary
       });
 
     if (insertError) {
@@ -120,8 +199,24 @@ export async function uploadRecording(blob: Blob, location = '') {
       details: uploadError.details
     });
     console.groupEnd();
-    throw new Error(
-      `Upload failed during ${uploadError.stage || 'process'}: ${uploadError.message}`
-    );
+
+    // Check for specific error types
+    if (uploadError.message?.includes('Permission denied')) {
+      throw new Error('Camera or microphone access denied. Please allow access in your browser settings.');
+    } else if (uploadError.message?.includes('NotFoundError')) {
+      throw new Error('Camera or microphone not found. Please check your device connections.');
+    } else if (uploadError.message?.includes('NotReadableError')) {
+      throw new Error('Camera or microphone is in use by another application.');
+    } else if (uploadError.stage === 'auth') {
+      throw new Error('Authentication failed. Please sign in again.');
+    } else if (uploadError.stage === 'storage') {
+      throw new Error('Failed to upload recording. Please check your internet connection.');
+    } else if (uploadError.stage === 'database') {
+      throw new Error('Failed to save recording details. Please try again.');
+    } else {
+      throw new Error(
+        `Upload failed during ${uploadError.stage || 'process'}: ${uploadError.message}`
+      );
+    }
   }
 }

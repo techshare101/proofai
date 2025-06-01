@@ -125,7 +125,9 @@ export default function Recorder() {
       }
 
       if (streamRef.current) {
-        const recorder = new MediaRecorder(streamRef.current);
+        const recorder = new MediaRecorder(streamRef.current, {
+        mimeType: 'video/webm;codecs=vp8,opus'
+      });
         chunks.current = [];
 
         recorder.ondataavailable = (e) => {
@@ -136,7 +138,7 @@ export default function Recorder() {
 
         recorder.onstop = async () => {
           try {
-            const blob = new Blob(chunks.current, { type: 'video/webm' });
+            const blob = new Blob(chunks.current, { type: 'video/webm;codecs=vp8,opus' });
             const publicUrl = await uploadRecording(blob, 'ProofAI Live');
             if (publicUrl) {
               router.push(`/summary?videoUrl=${encodeURIComponent(publicUrl)}`);

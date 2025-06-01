@@ -41,13 +41,33 @@ export default function LegalSummaryGenerator({ caseId, location, userName }: Ge
       return;
     }
 
+    // Ensure transcript has meaningful content
+    const cleanTranscript = transcriptText.trim();
+    if (cleanTranscript.length < 10) {
+      setError('Transcript appears too short. Please ensure audio is captured correctly.');
+      return;
+    }
+
     try {
       setIsGenerating(true);
       setError('');
       
-      console.log('📤 Sending to GPT:', transcriptText);
+      console.log('📤 Preparing evidence analysis:', {
+        hasTranscript: !!transcriptText,
+        transcriptLength: transcriptText.length,
+        hasFrame: !!frameUrl,
+        metadata: { caseId, location, userName }
+      });
+      
       const generatedSummary = await GPTService.generateLegalSummary(
-        transcriptText,
+        `[LEGAL RECORDING TRANSCRIPT]
+Case ID: ${caseId || 'Not specified'}
+Location: ${location || 'Not specified'}
+Recorded by: ${userName || 'Not specified'}
+Timestamp: ${new Date().toLocaleString()}
+
+Transcript Content:
+${transcriptText}`,
         frameUrl || undefined
       );
       
