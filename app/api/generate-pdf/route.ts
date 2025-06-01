@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
         safety: false,
         explanation: 'No explanation provided.',
       },
+      transcript: data.transcript || 'No transcript available.',
       videoUrl: data.videoUrl || '',
     };
 
@@ -30,10 +31,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, path: pdfPath });
 
   } catch (error: any) {
-    console.error('❌ PDF generation error:', error);
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 }
-    );
+    console.error('PDF Generation Error:', error);
+    const errorMessage = error.message.includes('ENOENT') && error.message.includes('.afm')
+      ? 'Font configuration error. Please check server configuration.'
+      : error.message;
+    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
   }
 }
