@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
-interface SummaryData {
+export interface SummaryData {
   summary: {
     title: string;
     summary: string;
@@ -10,7 +10,8 @@ interface SummaryData {
     location: string;
     legalRelevance: string;
   };
-  transcriptText: string;
+  transcriptText?: string;
+  transcript?: string;
   frameUrl?: string;
   metadata?: {
     caseId?: string;
@@ -41,7 +42,7 @@ export class PDFService {
     return lines;
   }
 
-  public static generateSummaryPDF(data: SummaryData): void {
+  public static generateSummaryPDF(data: SummaryData): Uint8Array {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
     let yPos = 20;
@@ -112,7 +113,8 @@ export class PDFService {
     yPos += lineHeight;
 
     doc.setFont('helvetica', 'normal');
-    const transcriptLines = this.formatText(data.transcriptText, 75);
+    const transcriptContent = data.transcript || data.transcriptText || "Transcript is still processing or unavailable.";
+    const transcriptLines = this.formatText(transcriptContent, 75);
     transcriptLines.forEach(line => {
       if (yPos >= doc.internal.pageSize.height - margin) {
         doc.addPage();
@@ -147,7 +149,8 @@ export class PDFService {
     yPos += lineHeight * 2;
     doc.text('Name (Print): ___________________', margin, yPos);
 
-    // Save the PDF
-    doc.save('ProofAI_Summary.pdf');
+    // Return the PDF as a buffer
+    const buffer = doc.output('arraybuffer');
+    return new Uint8Array(buffer);
   }
 }

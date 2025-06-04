@@ -110,6 +110,7 @@ export async function uploadRecording(blob: Blob, location = '') {
     // 8. Generate summary
     console.log('📝 Generating summary...');
     const summaryResult = await generateVideoSummary(urlData.publicUrl, transcript);
+    summaryResult.transcript = transcript; // Ensure transcript is included in the summary
     console.log('✅ Summary generated');
 
     // 9. Generate PDF
@@ -123,6 +124,7 @@ export async function uploadRecording(blob: Blob, location = '') {
         body: JSON.stringify({
           data: {
             summary: summaryResult.summary,
+            transcript: transcript || 'No transcript available',  // Primary transcript field
             participants: ['Witness: Kojo'],
             keyEvents: [
               `Recording Time: ${new Date().toLocaleString()}`,
@@ -159,8 +161,21 @@ export async function uploadRecording(blob: Blob, location = '') {
         throw new Error(`PDF generation failed: ${error.error}`);
       }
 
-      const { path: pdfPath } = await response.json();
-      console.log('✅ PDF generated at:', pdfPath);
+      const blob = await response.blob();
+      console.log('✅ PDF blob received, size:', blob.size, 'type:', blob.type);
+
+      const reportUrl = window.URL.createObjectURL(blob);
+
+      // Trigger download
+      const a = document.createElement("a");
+      a.href = reportUrl;
+      a.download = "ProofAI_Report.pdf"; 
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a); // Clean up anchor element
+      window.URL.revokeObjectURL(reportUrl); // Clean up object URL
+
+      console.log('✅ PDF report downloaded successfully.');
     } catch (pdfError) {
       console.error('❌ PDF generation failed:', pdfError);
       if (pdfError instanceof Error) {

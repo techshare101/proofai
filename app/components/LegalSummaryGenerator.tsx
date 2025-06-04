@@ -156,16 +156,51 @@ ${transcriptText}`,
               </div>
               
               <button
-                onClick={() => {
-                  PDFService.generateSummaryPDF({
-                    summary,
-                    transcriptText,
-                    frameUrl,
+                onClick={async () => {
+                  if (!summary) return;
+
+                  const reportData = {
+                    summary: {
+                      title: "ProofAI Voice Evidence Report",
+                      summary: summary.summary,
+                      keyParticipants: summary.keyParticipants,
+                      time: summary.time,
+                      location: summary.location,
+                      legalRelevance: summary.legalRelevance
+                    },
+                    transcript: transcriptText,
+                    frameUrl: frameUrl,
                     metadata: {
-                      caseId,
-                      userName
+                      userName: userName || "Anonymous",
+                      caseId: caseId || `CASE-${Date.now()}`
                     }
-                  });
+                  };
+
+                  try {
+                    const response = await fetch("/api/generate-pdf", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ data: reportData })
+                    });
+
+                    if (response.ok) {
+                      const blob = await response.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = "ProofAI_Report.pdf";
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      window.URL.revokeObjectURL(url);
+                      console.log("📄 PDF downloaded successfully.");
+                    } else {
+                      const error = await response.json();
+                      console.error("❌ PDF generation failed:", error);
+                    }
+                  } catch (err) {
+                    console.error("❌ Error generating PDF:", err);
+                  }
                 }}
                 className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded"
               >

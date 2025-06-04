@@ -1,40 +1,54 @@
-// app/api/generate-pdf/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { generatePDF } from '@/utils/generatePDF';
+import { PDFService, SummaryData } from '../../services/pdfService'; // Adjusted path
 
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const { data, options } = await req.json();
+    const body = await request.json();
+    const requestData = body.data as Partial<SummaryData>; // Expect data under a 'data' key
 
-    // fallback-safe default values
-    const safeData = {
-      summary: data.summary || 'No summary provided.',
-      participants: data.participants || ['N/A'],
-      keyEvents: data.keyEvents || ['N/A'],
-      context: data.context || {
-        time: new Date().toISOString(),
-        location: 'Unknown',
-        environmentalFactors: 'Unknown',
+    if (!requestData || !requestData.summary) {
+      return NextResponse.json({ success: false, error: 'Missing required summary data in request body under "data" key.' }, { status: 400 });
+    }
+
+    // Prepare data with fallbacks, ensuring it matches SummaryData structure
+    const processedData: SummaryData = {
+      summary: {
+        title: requestData.summary.title || 'ProofAI Report',
+        summary: requestData.summary.summary || 'No summary provided.',
+        keyParticipants: requestData.summary.keyParticipants || 'N/A',
+        time: requestData.summary.time || new Date().toLocaleString(),
+        location: requestData.summary.location || 'Unknown',
+        legalRelevance: requestData.summary.legalRelevance || 'No specific legal relevance noted.',
       },
-      notableQuotes: data.notableQuotes || ['No quotes provided.'],
-      reportRelevance: data.reportRelevance || {
-        legal: false,
-        hr: false,
-        safety: false,
-        explanation: 'No explanation provided.',
-      },
-      transcript: data.transcript || 'No transcript available.',
-      videoUrl: data.videoUrl || '',
+      transcript: requestData.transcript || requestData.transcriptText || 'No transcript available.',
+      frameUrl: requestData.frameUrl || undefined,
+      metadata: {
+        caseId: requestData.metadata?.caseId || undefined,
+        userName: requestData.metadata?.userName || undefined,
+      }
     };
 
-    const pdfPath = await generatePDF(safeData, options);
-    return NextResponse.json({ success: true, path: pdfPath });
+    const pdfBuffer = PDFService.generateSummaryPDF(processedData);
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      console.error('PDF Generation Error: Buffer is undefined or empty.');
+      throw new Error('PDF generation failed: Buffer is undefined or empty.');
+    }
+
+    console.log('✅ PDF generated successfully. Buffer length:', pdfBuffer.length);
+
+    const headers = new Headers();
+    headers.set('Content-Type', 'application/pdf');
+    headers.set('Content-Disposition', 'attachment; filename="ProofAI_Report.pdf"'); // Added quotes for filename
+
+    return new NextResponse(pdfBuffer, {
+      status: 200,
+      headers: headers,
+    });
 
   } catch (error: any) {
-    console.error('PDF Generation Error:', error);
-    const errorMessage = error.message.includes('ENOENT') && error.message.includes('.afm')
-      ? 'Font configuration error. Please check server configuration.'
-      : error.message;
+    console.error('PDF Generation Route Error:', error);
+    const errorMessage = error.message || 'Failed to generate PDF due to an unexpected error.';
     return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
   }
 }

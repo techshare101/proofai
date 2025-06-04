@@ -18,26 +18,92 @@ export default function SummaryPage() {
   const [userLocation, setUserLocation] = useState<string>('Brooklyn, NY');
 
   useEffect(() => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          try {
-            const response = await fetch(
-              `https://api.opencagedata.com/geocode/v1/json?q=${position.coords.latitude}+${position.coords.longitude}&key=af5e9cfe0b6a443f80edd940d23718f0`
-            );
-            const data = await response.json();
-            if (data.results?.[0]?.formatted) {
-              setUserLocation(data.results[0].formatted);
-            }
-          } catch (err) {
-            console.error("Error getting location name:", err);
-          }
-        },
-        (err) => {
-          console.error("Geolocation error:", err);
+    const OPENCAGE_API_KEY = process.env.NEXT_PUBLIC_OPENCAGE_API_KEY;
+    console.log('🔑 OpenCage API Key exists:', !!OPENCAGE_API_KEY);
+
+    const getLocationFromIP = async () => {
+      try {
+        console.log('📍 Falling back to IP-based location...');
+        const response = await fetch('https://ipapi.co/json/');
+        const data = await response.json();
+        if (data.city && data.region) {
+          const location = `${data.city}, ${data.region}, ${data.country_name}`;
+          console.log('📍 IP location resolved:', location);
+          setUserLocation(location);
+          return true;
         }
-      );
-    }
+      } catch (err) {
+        console.error('❌ IP location error:', err);
+      }
+      return false;
+    };
+
+    const getLocation = async () => {
+      if (!OPENCAGE_API_KEY) {
+        console.error('❌ OpenCage API key not found in environment');
+        await getLocationFromIP();
+        return;
+      }
+
+      if (!('geolocation' in navigator)) {
+        console.log('🌍 Geolocation not supported');
+        await getLocationFromIP();
+        return;
+      }
+
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 0
+          });
+        });
+
+        console.log('📍 Got coordinates:', {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        });
+
+        const response = await fetch(
+          `https://api.opencagedata.com/geocode/v1/json?q=${position.coords.latitude}+${position.coords.longitude}&key=${OPENCAGE_API_KEY}`
+        );
+
+        if (!response.ok) {
+          throw new Error(`OpenCage API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        if (!data.results?.length) {
+          console.error('❌ No results from OpenCage:', data);
+          await getLocationFromIP();
+          return;
+        }
+
+        const location = data.results[0].formatted;
+        console.log('📍 Location resolved:', location);
+        setUserLocation(location);
+      } catch (err) {
+        console.error('❌ Error getting location:', err);
+        if (err instanceof GeolocationPositionError) {
+          switch(err.code) {
+            case err.PERMISSION_DENIED:
+              console.log('🚫 Location permission denied, trying IP fallback...');
+              break;
+            case err.POSITION_UNAVAILABLE:
+              console.log('❌ Location unavailable, trying IP fallback...');
+              break;
+            case err.TIMEOUT:
+              console.log('⏰ Location timed out, trying IP fallback...');
+              break;
+          }
+        }
+        await getLocationFromIP();
+      }
+    };
+
+    getLocation();
   }, []);
 
   const fetchSummary = async () => {
@@ -68,7 +134,11 @@ export default function SummaryPage() {
         // Validate result before setting state
         if (result.summary?.trim()) {
           console.log('✅ New summary generated:', result.summary.substring(0, 100) + '...');
-          setSummary(result);
+          // Ensure transcript is included in summary state
+          setSummary({
+            ...result,
+            transcript: result.transcript || result.notableQuotes?.join('\n\n')
+          });
         } else {
           console.error('❌ Generated summary is empty or invalid:', result);
           throw new Error('Generated summary is empty or invalid');
@@ -203,19 +273,67 @@ ALTER TABLE recordings ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT n
       <SummaryCard result={summary} isLoading={false} />
       <div className="mt-6 space-x-4">
         <button
-          onClick={() => {
+          onClick={async () => {
             if (!summary) return;
-            generateSummaryPDF({
-              summary: summary.summary || "Test summary content",
-              location: userLocation || "Unknown",
-              time: new Date().toLocaleString(),
-              videoUrl: videoUrl || "N/A",
-              legalRelevance: summary.reportRelevance?.explanation || "N/A"
+
+            // Get transcript from various sources in order of preference
+            const transcriptContent = summary.transcript || // From Whisper
+                                     summary.notableQuotes?.join('\n\n') || // From notable quotes
+                                     "Transcript is still processing or unavailable.";
+
+            // Log transcript source for debugging
+            console.log('📝 Transcript source:', {
+              fromWhisper: !!summary.transcript,
+              fromNotableQuotes: !summary.transcript && !!summary.notableQuotes,
+              transcriptLength: transcriptContent.length,
+              previewContent: transcriptContent.substring(0, 100) + '...'
             });
+
+            const reportData = {
+              summary: {
+                title: "ProofAI Voice Evidence Report",
+                summary: summary.summary || "No summary available.",
+                keyParticipants: summary.participants || "N/A",
+                time: new Date().toLocaleString(),
+                location: userLocation || "Unknown",
+                legalRelevance: summary.reportRelevance?.explanation || "No specific legal relevance noted."
+              },
+              transcript: transcriptContent,
+              metadata: {
+                userName: "Anonymous",
+                caseId: `CASE-${Date.now()}`
+              }
+            };
+
+            try {
+              const response = await fetch("/api/generate-pdf", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ data: reportData })
+              });
+
+              if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "ProofAI_Report.pdf";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+                console.log("📄 PDF downloaded successfully.");
+              } else {
+                const error = await response.json();
+                console.error("❌ PDF generation failed:", error);
+              }
+            } catch (err) {
+              console.error("❌ Error generating PDF:", err);
+            }
           }}
           className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors inline-block"
         >
-          🔽 Manually Download PDF
+          🔽 Download Legal Report
         </button>
       </div>
     </div>
