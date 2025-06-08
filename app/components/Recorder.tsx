@@ -2,7 +2,7 @@
 
 import React, { useRef, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { uploadRecording } from '@/lib/uploadRecording';
+import { UploadService } from '../services/uploadService';
 import { useAuth } from '../contexts/AuthContext';
 import { useRecorder } from '../hooks/useRecorder';
 
@@ -139,7 +139,7 @@ export default function Recorder() {
         recorder.onstop = async () => {
           try {
             const blob = new Blob(chunks.current, { type: 'video/webm;codecs=vp8,opus' });
-            const publicUrl = await uploadRecording(blob, 'ProofAI Live');
+            const publicUrl = await UploadService.uploadRecording(blob, 'ProofAI Live');
             if (publicUrl) {
               router.push(`/summary?videoUrl=${encodeURIComponent(publicUrl)}`);
             }

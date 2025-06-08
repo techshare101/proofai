@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { uploadRecording } from '../lib/uploadRecording';
+import { UploadService } from '../services/uploadService';
 
 type RecorderStatus = 'idle' | 'requesting' | 'ready' | 'recording' | 'uploading' | 'error';
 
@@ -61,7 +61,7 @@ export function useRecorder({ onUploadSuccess, location, userId }: UseRecorderOp
           chunksRef.current = []; // Clear chunks
 
           console.log('📹 Processing recording...');
-          const publicUrl = await uploadRecording(blob, location);
+          const publicUrl = await UploadService.uploadRecording(blob, location);
           console.log('✅ Upload successful!');
           onUploadSuccess(publicUrl);
         } catch (err) {
