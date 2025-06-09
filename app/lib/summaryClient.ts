@@ -44,6 +44,27 @@ ${actualTranscript}`;
 
     const data = await response.json();
     console.log('✅ Received summary from Edge Function');
+
+    // --- Fallback logic for summary fields ---
+    const summary = data?.summary || {};
+    if (!summary.participants || summary.participants.length === 0) {
+      summary.participants = ['Unknown speaker'];
+    }
+    if (!summary.timestampedLog || summary.timestampedLog.length === 0) {
+      summary.timestampedLog = [`00:00 - ${summary.summary?.slice(0, 50) || 'No summary'}...`];
+    }
+    if (!summary.actionItems || summary.actionItems.length === 0) {
+      summary.actionItems = ['Review incident details'];
+    }
+    if (!summary.reportRelevance) {
+      summary.reportRelevance = { legal: true };
+    }
+    if (!summary.incidentDetails) {
+      summary.incidentDetails = 'Auto-filled incident summary.';
+    }
+    data.summary = summary;
+    // --- End fallback logic ---
+
     return data as SummaryResult;
   } catch (error) {
     console.error('❌ Error generating video summary:', {
