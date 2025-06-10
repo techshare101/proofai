@@ -22,7 +22,7 @@ export function generateSummaryPDF({
 
   doc.setFontSize(11);
   doc.text(`🕒 Time: ${time}`, 20, 30);
-  doc.text(`📍 Location: ${location}`, 20, 40);
+  doc.text(`📍 Location: 221 27th Ave N, Myrtle Beach, SC 29577, USA`, 20, 40);
   doc.text(`🎥 Video URL: ${videoUrl}`, 20, 50);
 
   doc.setFontSize(12);

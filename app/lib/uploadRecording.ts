@@ -1,4 +1,5 @@
 // lib/uploadRecording.ts
+import { getAddressFromCoordinates } from "@/utils/geocodeAddress";
 import { TranscriptionService, TranscriptionResult } from '../services/transcriptionService';
 import { GPTService } from '../services/gptService';
 import { supabase } from './supabase';
@@ -190,9 +191,23 @@ export async function uploadRecording(audioBlob: Blob, location: string): Promis
       if (typeof summary === 'object' && summary !== null) {
         await new Promise<void>(resolve => {
           navigator.geolocation.getCurrentPosition(
-            (pos) => {
+            async (pos) => {
               const { latitude, longitude } = pos.coords;
-              summary.location = `Lat: ${latitude}, Lng: ${longitude}`;
+              try {
+                console.log("🌎 Requesting geocode for:", latitude, longitude);
+                const res = await fetch("/api/geocode", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ lat: latitude, lng: longitude }),
+                });
+                const data = await res.json();
+                console.log("🌎 Geocode API response:", data);
+                const { address } = data;
+                summary.location = address;
+              } catch (err) {
+                console.error("❌ Geocoding failed:", err);
+                summary.location = `Lat: ${latitude}, Lng: ${longitude}`; // fallback
+              }
               resolve();
             },
             (err) => {
