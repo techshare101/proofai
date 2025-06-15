@@ -10,18 +10,28 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!isLoading && !session) {
-      router.push('/login'); // redirect if not logged in
+      router.replace('/login'); // ✅ Use replace for cleaner navigation
     }
   }, [isLoading, session, router]);
 
-  if (isLoading || !session) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="mb-4">
             <div className="h-12 w-12 border-2 border-indigo-500 rounded-full animate-spin inline-block"></div>
           </div>
-          <p className="text-gray-600">Checking auth...</p>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600">Redirecting to login...</p>
         </div>
       </div>
     );
@@ -35,6 +45,9 @@ export default function DashboardPage() {
             <h1 className="text-3xl font-bold text-gray-900">Welcome to your Dashboard</h1>
             <p className="mt-4 text-gray-600">
               You&apos;re logged in as {session.user?.email}
+            </p>
+            <p className="mt-2 text-gray-500">
+              Let&apos;s build the app experience here.
             </p>
           </div>
         </div>
