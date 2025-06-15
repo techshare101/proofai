@@ -30,7 +30,24 @@ async function generatePdfWithRetry(data: {
         await new Promise(resolve => setTimeout(resolve, retryDelay));
       }
 
+      // CRITICAL FIX: Save video URL before formatting potentially removes it
+      // Extract from summary if it exists
+      const videoUrl = data.summary && typeof data.summary === 'object' && data.summary.videoUrl ? 
+        data.summary.videoUrl : 'https://proof.ai/evidence';
+      
+      console.log('🔗 USING VIDEO URL FOR PDF:', videoUrl);
+      
+      // Format the summary as usual
       const formattedSummary = formatSummary(data.summary);
+      
+      // RADICAL FIX: Force videoUrl into formatted summary 
+      if (typeof formattedSummary === 'object') {
+        formattedSummary.videoUrl = videoUrl;
+        console.log('✅ Injected video URL directly into formatted summary');
+      }
+      
+      // Create the request object for PDF generation with the videoUrl
+      // integrated at every possible level to ensure it makes it through
       const pdfPath = await ClientPDFService.generatePDFReport({
         summary: formattedSummary,
         transcript: data.transcript,
@@ -39,12 +56,14 @@ async function generatePdfWithRetry(data: {
         location: data.location,
         caseId: `CASE-${Date.now()}`,
         reportDate: new Date().toISOString(),
+        // RADICAL FIX: Add videoUrl at top level too
+        videoUrl: videoUrl 
       }, {
         watermark: false,
         confidential: true,
         includeSignature: true,
         includeTimestamps: true,
-        includeFooter: true
+        includeFooter: true,
       });
 
       return pdfPath;
@@ -222,7 +241,24 @@ export async function uploadRecording(audioBlob: Blob, location: string): Promis
       }
     }
 
-    // 10. Generate PDF with retry
+    // 10. Generate signed URL for the recording video
+    console.log('📹 Creating signed URL for video recording...');
+    const { data: signedUrlData, error: signedUrlError } = await supabase
+      .storage
+      .from('recordings')
+      .createSignedUrl(filename, 60 * 60 * 24 * 7); // Valid for 7 days
+
+    if (signedUrlError) {
+      console.error("❌ Failed to generate signed video URL:", signedUrlError);
+      // Set a fallback URL
+      summary.videoUrl = "https://proof.ai/evidence";
+    } else {
+      // Inject the signed URL into the summary object
+      summary.videoUrl = signedUrlData.signedUrl;
+      console.log('✅ Generated signed video URL:', summary.videoUrl);
+    }
+
+    // 11. Generate PDF with retry
     const pdfResult = await generatePdfWithRetry({
       summary,
       transcript: translatedTranscript,

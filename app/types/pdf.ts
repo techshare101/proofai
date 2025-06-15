@@ -36,6 +36,10 @@ export interface StructuredSummary {
   participants?: string[];
   timestampedLog?: string[];
   transcript?: string;
+  videoUrl?: string; // URL to related video evidence
+  publicUrl?: string; // Public URL for verification QR code
+  lat?: number; // Latitude for location
+  lng?: number; // Longitude for location
 }
 
 export interface PdfGenerationOptions {

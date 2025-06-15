@@ -12,7 +12,14 @@ import { toast } from 'react-hot-toast';
 type RecorderStatus = 'idle' | 'requesting' | 'ready' | 'recording' | 'uploading' | 'error';
 
 // Components
-const StatusMessage = ({ status, error }: { status: RecorderStatus; error?: string }) => {
+const StatusMessage = ({ status, error, recordingTime }: { status: RecorderStatus; error?: string; recordingTime?: number }) => {
+  // Format seconds to MM:SS
+  function formatTime(seconds: number): string {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  }
+
   const messages: Record<RecorderStatus, string> = {
     idle: 'Initializing camera...',
     requesting: 'Requesting camera access...',
@@ -23,12 +30,24 @@ const StatusMessage = ({ status, error }: { status: RecorderStatus; error?: stri
   };
 
   const isError = status === 'error';
+  
   return (
     <div className="text-center">
       {isError ? (
         <p className="text-red-500">{messages[status]}</p>
       ) : (
         <p>{messages[status]}</p>
+      )}
+      
+      {recordingTime !== undefined && status === 'recording' && (
+        <div className="text-lg font-bold text-center mt-2">
+          Recording Time: {formatTime(recordingTime)}
+        </div>
+      )}
+      {recordingTime !== undefined && status === 'recording' && recordingTime >= 270 && (
+        <div className="text-yellow-600 font-bold text-center mt-2">
+          ⚠️ Recording will end in {300 - recordingTime} seconds
+        </div>
       )}
     </div>
   );
@@ -53,19 +72,22 @@ export default function Recorder() {
   const [showDownload, setShowDownload] = useState(false)
   const chunks = useRef<Blob[]>([])
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // Recording time tracking
+  const [recordingTime, setRecordingTime] = useState(0)
+  const recordingTimer = useRef<NodeJS.Timeout | null>(null)
+  const MAX_RECORDING_TIME = 300 // 5 minutes in seconds
+  const WARNING_TIME = 270 // Show warning at 4:30 (30 seconds before max)
+  
+  // File size constants
+  const MAX_FILE_SIZE_MB = 25 // OpenAI's Whisper API limit
 
-  // Initialize camera only when videoRef is available
+  // Initialize camera on mount
   useEffect(() => {
     let mounted = true;
     let retryCount = 0;
     const maxRetries = 3;
     const retryDelay = 1000; // 1 second
-
-    // Check if videoRef is available before initializing camera
-    if (!videoRef.current) {
-      console.log('Video element not yet available, waiting...');
-      return; // Exit early if video element is not available
-    }
 
     const init = async () => {
       if (!mounted) return;
@@ -85,20 +107,16 @@ export default function Recorder() {
       }
     };
 
-    // Short delay to ensure DOM is fully rendered
-    setTimeout(() => {
-      if (mounted && videoRef.current) {
-        init();
-      }
-    }, 100);
+    init();
 
     // Cleanup on unmount
     return () => {
       mounted = false;
       if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+      if (recordingTimer.current) clearInterval(recordingTimer.current);
       cleanupStream();
     };
-  }, [videoRef.current]) // Add videoRef.current as dependency
+  }, [])
 
   const initializeCamera = async () => {
     setStatus('requesting');
@@ -211,6 +229,105 @@ export default function Recorder() {
     }
   };
 
+  const cleanupStream = () => {
+    try {
+      // Stop all tracks in the stream
+      if (streamRef.current) {
+        const tracks = streamRef.current.getTracks();
+        tracks.forEach(track => {
+          track.stop();
+          streamRef.current?.removeTrack(track);
+        });
+        streamRef.current = null;
+      }
+
+      // Clear video element
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+        videoRef.current.load(); // Force reload
+      }
+
+      // Stop media recorder if active
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+      setMediaRecorder(null);
+      setRecording(false);
+
+      // Reset state
+      setStatus('idle');
+      setError('');
+    } catch (err) {
+      console.error('Error cleaning up stream:', err);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder?.state === 'recording') {
+      mediaRecorder.stop();
+      setRecording(false);
+    }
+    
+    // Clear the recording timer
+    if (recordingTimer.current) {
+      clearInterval(recordingTimer.current);
+      recordingTimer.current = null;
+    }
+  };
+
+  const initializeCamera = async () => {
+    try {
+      setStatus('requesting');
+      
+      // Request camera and microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
+      
+      // Store stream reference
+      streamRef.current = stream;
+      
+      // Display in video element
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          if (videoRef.current) {
+            videoRef.current.play()
+              .then(() => {
+                setStatus('ready');
+              })
+              .catch((e) => {
+                console.error('Error playing video:', e);
+                setError('Failed to play video stream.');
+              });
+          }
+        };
+        
+        videoRef.current.onerror = (e) => {
+          console.error('Video element error:', e);
+        };
+      }
+    } catch (err: any) {
+      let errorMessage = 'Failed to access camera or microphone.';
+      
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        errorMessage = 'Camera access denied. Please grant permission and try again.';
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        errorMessage = 'No camera or microphone found.';
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        errorMessage = 'Camera or microphone is already in use.';
+      } else if (err.name === 'OverconstrainedError') {
+        errorMessage = 'Camera constraints not satisfied. Try a different device.';
+      }
+      
+      setError(errorMessage);
+      console.error('Camera initialization error:', err);
+      setStatus('error');
+      throw err; // Rethrow for useEffect handler
+    }
+  };
+
   const startRecording = async () => {
     try {
       if (!streamRef.current) {
@@ -219,21 +336,53 @@ export default function Recorder() {
 
       if (streamRef.current) {
         const recorder = new MediaRecorder(streamRef.current, {
-        mimeType: 'video/webm;codecs=vp8,opus'
-      });
+          mimeType: 'video/webm;codecs=vp8,opus'
+        });
         chunks.current = [];
+        setRecordingTime(0);
+
+        // Start timer to track recording duration
+        recordingTimer.current = setInterval(() => {
+          setRecordingTime(prev => {
+            const newTime = prev + 1;
+            // Auto-stop recording after MAX_RECORDING_TIME
+            if (newTime >= MAX_RECORDING_TIME && mediaRecorder?.state === 'recording') {
+              stopRecording();
+              return MAX_RECORDING_TIME;
+            }
+            return newTime;
+          });
+        }, 1000);
 
         recorder.ondataavailable = (e) => {
           if (e.data.size > 0) {
             chunks.current.push(e.data);
           }
         };
-
+        
         recorder.onstop = async () => {
           try {
-            setStatus('uploading');
             const blob = new Blob(chunks.current, { type: 'video/webm;codecs=vp8,opus' });
             
+            // Size validation - OpenAI Whisper API has ~25MB limit
+            const fileSizeMB = blob.size / (1024 * 1024);
+            const MAX_FILE_SIZE_MB = 25; // OpenAI's Whisper API limit
+            
+            console.log(`Recording size: ${fileSizeMB.toFixed(2)} MB`);
+            
+            if (fileSizeMB > MAX_FILE_SIZE_MB) {
+              const errorMessage = `Recording too large (${fileSizeMB.toFixed(2)} MB) for transcription. ` +
+                `Maximum supported size is ${MAX_FILE_SIZE_MB} MB. ` +
+                `Try a shorter recording (under 1 minute).`;
+              
+              toast.error(errorMessage);
+              setError(errorMessage);
+              setStatus('error');
+              return;
+            }
+            
+            setStatus('uploading');
+
             // Try to get user's location for more accurate report
             let location = 'Unknown Location';
             try {
@@ -306,17 +455,36 @@ export default function Recorder() {
       console.error('Recording error:', err);
     }
   };
-
-  const stopRecording = () => {
-    if (mediaRecorder?.state === 'recording') {
-      mediaRecorder.stop();
-      setRecording(false);
-    }
   };
 
   const retryCamera = async () => {
-    cleanupStream();
-    await initializeCamera();
+    // Use existing functions for cleanup and initialization
+    try {
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+      }
+      
+      // Clear video element
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+      
+      // Clear tracks from stream
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+      
+      // Reset states
+      setStatus('requesting');
+      setError('');
+      
+      // Try to initialize camera again
+      await startRecording();
+    } catch (err) {
+      console.error('Error retrying camera:', err);
+      setError('Failed to reconnect to camera');
+    }
   };
 
   return (

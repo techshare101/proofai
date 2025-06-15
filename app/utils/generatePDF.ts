@@ -1,5 +1,9 @@
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
-import { PdfGenerationOptions } from '../types/pdf';
+// ProofAI PDF Generation Utility
+// Enhanced with the new polished PDF generation capabilities
+
+import { StructuredSummary, PdfGenerationOptions } from '../types/pdf';
+import { generatePolishedPDF } from './pdfPolish';
+import { formatSummary } from './formatSummary';
 
 interface PdfRequest {
   content: string;
@@ -9,11 +13,7 @@ interface PdfRequest {
   structuredSummary?: StructuredSummary;
 }
 
-interface Section {
-  title: string;
-  content: string;
-}
-
+// Default options for PDF generation
 const DEFAULT_OPTIONS: PdfGenerationOptions = {
   watermark: false,
   confidential: true,
@@ -22,106 +22,117 @@ const DEFAULT_OPTIONS: PdfGenerationOptions = {
   includeFooter: true
 };
 
-import { StructuredSummary } from '../types/pdf';
-import { formatSummary } from './formatSummary';
-
-// Utility to strip emojis from text for PDF safety
-function sanitizeText(text: string): string {
-  return text
-    .replace('📄', '[Report]')
-    .replace('🏷️', '[Relevance]')
-    .replace('👥', '[Participants]')
-    .replace('🆔', '[ID]')
-    .replace('📅', '[Date]')
-    .replace('📍', '[Location]')
-    .replace(/\p{Emoji_Presentation}/gu, ''); // fallback to strip any remaining emojis
-}
-
+/**
+ * Legacy wrapper for generatePDF that uses the new polished PDF generator
+ * This maintains backward compatibility while leveraging the enhanced PDF generation
+ * @param request The PDF request containing necessary data
+ * @returns PDF as Uint8Array
+ */
 export async function generatePDF(request: PdfRequest): Promise<Uint8Array> {
-  const { options = DEFAULT_OPTIONS, caseId, generatedBy = 'ProofAI', structuredSummary } = request;
+  const { options = DEFAULT_OPTIONS, caseId, structuredSummary } = request;
+  
   try {
-    // Create PDF document
-    const pdfDoc = await PDFDocument.create();
-    let page = pdfDoc.addPage();
-    const { width, height } = page.getSize();
-
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    const fontSize = 12;
-    let y = height - 50;
-
-    // Apply emoji-safe sanitation
-    const cleanedSummary = sanitizeText(structuredSummary.summary || '');
-    const cleanedTranscript = sanitizeText(structuredSummary.transcript || '');
-    const cleanedOriginal = sanitizeText(structuredSummary.originalTranscript || '');
-    const cleanedLocation = sanitizeText(structuredSummary.location || '');
-    const cleanedCaseId = sanitizeText(structuredSummary.caseId || '');
-    const cleanedDate = sanitizeText(structuredSummary.reportDate || '');
-
-    // Title (bold, centered)
-    const title = 'PROOF AI INCIDENT REPORT';
-    page.drawText(title, {
-      x: width / 2 - boldFont.widthOfTextAtSize(title, 18) / 2,
-      y,
-      size: 18,
-      font: boldFont,
-      color: rgb(0, 0, 0)
+    // For content, use the outer content if no structured summary
+    const fullContent = request.content || '';
+    
+    // Get the structured summary data
+    // Always prioritize the structured summary for the report summary section
+    const structuredSummaryText = structuredSummary?.summary || '';
+    
+    // For transcript, use what's available
+    const transcript = structuredSummary?.transcript || '';
+    // Keep the original Spanish transcript separate
+    const cleanedOriginal = structuredSummary?.originalTranscript || '';
+    
+    // Extract location from structured summary content if it contains a line with "📍 Location:" prefix
+    let location = 'Unknown Location';
+    
+    // First try to get location from structuredSummary.summary (the structured content)
+    if (structuredSummaryText && structuredSummaryText.includes('📍 Location:')) {
+      // Look for the line with geocoded location info
+      const lines = structuredSummaryText.split('\n');
+      const locationLine = lines.find(line => line.trim().startsWith('📍 Location:'));
+      
+      if (locationLine) {
+        // Extract the part after "📍 Location:" as the clean location
+        location = locationLine.substring(locationLine.indexOf('📍 Location:') + '📍 Location:'.length).trim();
+        console.log(`🌍 generatePDF extracted location from structured summary: ${location}`);
+      }
+    }
+    
+    // Fall back to manually overridden location if available
+    if (location === 'Unknown Location' && structuredSummary?.location) {
+      location = structuredSummary.location;
+      console.log(`🌍 generatePDF using manually overridden location: ${location}`);
+    }
+    
+    // If we have latitude and longitude but no human-readable location, try to geocode it
+    if ((location === 'Unknown Location' || location.startsWith('Lat:')) && 
+        structuredSummary?.lat !== undefined && 
+        structuredSummary?.lng !== undefined) {
+      try {
+        const { getAddressFromCoordinates } = await import('./geocodeAddress');
+        const geocodedAddress = await getAddressFromCoordinates(
+          structuredSummary.lat,
+          structuredSummary.lng
+        );
+        
+        // Only use geocoded address if it's not in the lat/lng format
+        if (geocodedAddress && !geocodedAddress.startsWith('Lat:')) {
+          location = geocodedAddress;
+          console.log(`🌍 generatePDF using geocoded location: ${location}`);
+        }
+      } catch (error) {
+        console.error('Error geocoding coordinates:', error);
+      }
+    }
+    
+    const videoUrl = structuredSummary?.videoUrl || 'https://proof.ai/evidence';
+    const reportDate = structuredSummary?.reportDate || new Date().toLocaleDateString();
+    const participants = structuredSummary?.participants || [];
+    
+    // Determine legal relevance text based on reportRelevance object
+    let legalRelevance = 'Not specified';
+    if (structuredSummary?.reportRelevance?.legal === true) {
+      legalRelevance = 'Legally relevant';
+    } else if (structuredSummary?.reportRelevance?.legal === false) {
+      legalRelevance = 'Not legally relevant';
+    }
+    
+    // Determine the reportPublicUrl (if available) for verification QR code
+    const reportPublicUrl = structuredSummary?.publicUrl || '';
+    
+    // Generate polished PDF using the new utility
+    const pdfBlob = await generatePolishedPDF({
+      // Pass both the structured summary text and the overall content
+      // This ensures the structured summary is rendered in the "REPORT SUMMARY" section
+      summary: {
+        text: fullContent,               // The original unstructured content
+        structuredSummaryText: structuredSummaryText  // The structured summary content
+      },
+      // Required property for PDF content - use transcript or fullContent
+      content: transcript || fullContent,
+      transcript,
+      original_transcript: cleanedOriginal, // Pass the original Spanish transcript
+      location,
+      videoUrl,
+      caseId: caseId || structuredSummary?.caseId || 'Unspecified',
+      reportDate,
+      participants,
+      // Pass both relevance options to ensure compatibility
+      relevance: legalRelevance,
+      legalRelevance,
+      includeSignature: options.includeSignature,
+      reportPublicUrl: reportPublicUrl
     });
-    y -= 18 + 8;
-
-    // Horizontal line under title
-    page.drawLine({
-      start: { x: 50, y: y },
-      end: { x: width - 50, y: y },
-      thickness: 1,
-      color: rgb(0.1, 0.1, 0.1)
-    });
-    y -= 18;
-
-    // Metadata (normal font)
-    page.drawText(`Case ID: ${cleanedCaseId}`, { x: 50, y, size: fontSize, font, color: rgb(0, 0, 0) });
-    y -= 16;
-    page.drawText(`Report Date: ${new Date(cleanedDate).toLocaleString()}`, { x: 50, y, size: fontSize, font, color: rgb(0, 0, 0) });
-    y -= 16;
-    page.drawText(`Location: ${cleanedLocation}`, { x: 50, y, size: fontSize, font, color: rgb(0, 0, 0) });
-    y -= 16;
-    page.drawText(`Generated By: ${generatedBy}`, { x: 50, y, size: fontSize, font, color: rgb(0, 0, 0) });
-    y -= 24;
-
-    // Section: Summary
-    page.drawText('Summary:', { x: 50, y, size: 14, font: boldFont, color: rgb(0.1, 0.1, 0.5) });
-    y -= 18;
-    for (const line of cleanedSummary.split('\n')) {
-      page.drawText(line, { x: 60, y, size: fontSize, font, color: rgb(0, 0, 0) });
-      y -= 16;
-      if (y < 50) { y = height - 50; page = pdfDoc.addPage(); }
-    }
-    y -= 10;
-
-    // Section: Transcript
-    page.drawText('Transcript:', { x: 50, y, size: 14, font: boldFont, color: rgb(0.1, 0.1, 0.5) });
-    y -= 18;
-    for (const line of cleanedTranscript.split('\n')) {
-      page.drawText(line, { x: 60, y, size: fontSize, font, color: rgb(0, 0, 0) });
-      y -= 16;
-      if (y < 50) { y = height - 50; page = pdfDoc.addPage(); }
-    }
-    y -= 10;
-
-    // Section: Original Transcript
-    page.drawText('Original Transcript:', { x: 50, y, size: 14, font: boldFont, color: rgb(0.1, 0.1, 0.5) });
-    y -= 18;
-    for (const line of cleanedOriginal.split('\n')) {
-      page.drawText(line, { x: 60, y, size: fontSize, font, color: rgb(0, 0, 0) });
-      y -= 16;
-      if (y < 50) { y = height - 50; page = pdfDoc.addPage(); }
-    }
-
-    const pdfBytes = await pdfDoc.save();
-    console.log('[generatePDF] Byte length of final PDF:', pdfBytes.length);
+    
+    // Convert Blob to Uint8Array for compatibility with existing code
+    const arrayBuffer = await pdfBlob.arrayBuffer();
+    const pdfBytes = new Uint8Array(arrayBuffer);
+    
     return pdfBytes;
   } catch (error) {
-    console.error('PDF generation error:', error);
+    console.error('Polished PDF generation error:', error);
     throw error;
   }
 }

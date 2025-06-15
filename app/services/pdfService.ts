@@ -1,6 +1,7 @@
 import { generatePDF } from '../utils/generatePDF';
 import { StructuredSummary, PdfGenerationOptions, PdfGenerationRequest } from '../types/pdf';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { getAddressFromCoordinates } from '../utils/geocodeAddress';
 
 
 
@@ -26,12 +27,36 @@ export class PDFService {
     includeTimestamps: true
   }): Promise<string> {
     try {
+      // If lat and lng are available, use reverse geocoding to get a more accurate location
+      if (summary.lat && summary.lng) {
+        try {
+          console.log(`🌎 Requesting reverse geocoding for: ${summary.lat}, ${summary.lng}`);
+          const address = await getAddressFromCoordinates(summary.lat, summary.lng);
+          
+          // Update location only if geocoding was successful
+          if (address && address.trim() !== '') {
+            // Directly modify the location property so it's updated throughout the reference chain
+            summary.location = address;
+            console.log(`🌎 Location updated to: ${address}`);
+          }
+        } catch (geoError) {
+          console.error(`❌ Reverse geocoding failed: ${geoError instanceof Error ? geoError.message : 'Unknown error'}`);
+          // Geocoding failed, we'll use the default location value
+        }
+      }
+
       // Create the PDF generation request
-      const request: PdfGenerationRequest = {
-        summary,
-        options
+      // Note: PdfRequest expects 'content' property which we'll set to summary.summary
+      const request = {
+        content: summary.summary || '',  // Required by PdfRequest interface
+        caseId: summary.caseId,
+        structuredSummary: summary,
+        options: options
       };
 
+      // Log the location being sent to PDF generator
+      console.log(`[PDF API] 🌎 Location being sent to PDF generator: ${summary.location || 'Not available'}`);
+      
       // Generate the PDF using the utility
       const pdfBuffer = await generatePDF(request);
 

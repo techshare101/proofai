@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "test:pdf": "cross-env NODE_OPTIONS='--loader ts-node/esm' node app/test/generateSample.ts",
+    "test:pdf": "tsx app/test/generateSample.ts",
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start",
@@ -23,6 +23,7 @@
     "pdf-lib": "^1.17.1",
     "pdfkit": "^0.17.1",
     "pdfkit-table": "^0.1.99",
+    "qrcode": "^1.5.4",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-error-boundary": "^6.0.0",

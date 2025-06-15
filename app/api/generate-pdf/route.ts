@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
 
     // DEBUG: Log before PDF generation
     console.log('[PDF API] Calling generatePDF with summary:', summary);
+    console.log('[PDF API] 🌎 Location being sent to PDF generator:', summary.location);
     const pdfBuffer = Buffer.from(
       await generatePDF({
         content: formattedSummary,

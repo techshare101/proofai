@@ -1,15 +1,17 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { uploadRecording } from '../lib/uploadRecording';
+import { toast } from 'react-hot-toast';
 
-type RecorderStatus = 'idle' | 'requesting' | 'ready' | 'recording' | 'uploading' | 'error';
+type RecorderStatus = 'idle' | 'requesting' | 'ready' | 'recording' | 'uploading' | 'error' | 'size-error';
 
 interface UseRecorderOptions {
   onUploadSuccess: (url: string) => void;
   location: string;
   userId?: string;
+  maxFileSizeMB?: number; // Maximum file size in MB
 }
 
-export function useRecorder({ onUploadSuccess, location, userId }: UseRecorderOptions) {
+export function useRecorder({ onUploadSuccess, location, userId, maxFileSizeMB = 25 }: UseRecorderOptions) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -56,14 +58,26 @@ export function useRecorder({ onUploadSuccess, location, userId }: UseRecorderOp
 
       mediaRecorderRef.current.onstop = async () => {
         try {
-          setStatus('uploading');
           const blob = new Blob(chunksRef.current, { type: 'video/webm' });
           chunksRef.current = []; // Clear chunks
+          
+          // Check file size
+          const fileSizeMB = blob.size / (1024 * 1024);
+          console.log(`📊 Recording size: ${fileSizeMB.toFixed(2)} MB (max: ${maxFileSizeMB} MB)`);
+          
+          if (fileSizeMB > maxFileSizeMB) {
+            console.error(`❌ Recording too large: ${fileSizeMB.toFixed(2)} MB exceeds ${maxFileSizeMB} MB limit`);
+            setError(`Recording too large (${fileSizeMB.toFixed(1)} MB). Please try a shorter recording (max: ${maxFileSizeMB} MB).`);
+            setStatus('size-error');
+            toast.error(`Recording too large (${fileSizeMB.toFixed(1)} MB). Please try a shorter recording.`);
+            return;
+          }
 
+          setStatus('uploading');
           console.log('📹 Processing recording...');
-          const publicUrl = await uploadRecording(blob, location);
+          const result = await uploadRecording(blob, location);
           console.log('✅ Upload successful!');
-          onUploadSuccess(publicUrl);
+          onUploadSuccess(result.reportUrl);
         } catch (err) {
           console.error('❌ Upload error:', err);
           setError(err instanceof Error ? err.message : 'Failed to upload video');

@@ -289,27 +289,40 @@ ALTER TABLE recordings ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT n
               previewContent: transcriptContent.substring(0, 100) + '...'
             });
 
-            const reportData = {
-              summary: {
-                title: "ProofAI Voice Evidence Report",
-                summary: summary.summary || "No summary available.",
-                keyParticipants: summary.participants || "N/A",
-                time: new Date().toLocaleString(),
-                location: userLocation || "Unknown",
-                legalRelevance: summary.reportRelevance?.explanation || "No specific legal relevance noted."
-              },
-              transcript: transcriptContent,
-              metadata: {
-                userName: "Anonymous",
-                caseId: `CASE-${Date.now()}`
-              }
+            // Create a summary object with the correct structure for the PDF API
+            const caseId = `CASE-${Date.now()}`;
+            const updatedSummary = {
+              ...summary,
+              caseId: caseId,
+              reportDate: new Date().toISOString(),
+              location: userLocation || 'Unknown',  // Use geocoded location
             };
+            
+            console.log('📍 Location being sent to PDF API:', updatedSummary.location);
+            
+            // Format the summary text for the PDF
+            const formattedSummary = `PROOF AI INCIDENT REPORT\n\n` +
+              `Case ID: ${caseId}\n` +
+              `Report Date: ${new Date().toLocaleString()}\n` +
+              `Location: ${updatedSummary.location}\n` +
+              `Reviewed By: ProofAI Whisper Bot\n\n` +
+              `Summary:\n${summary.summary || 'No summary available.'}\n`;
 
             try {
+              // Send the correctly structured request to match the API expectations
               const response = await fetch("/api/generate-pdf", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ data: reportData })
+                body: JSON.stringify({
+                  summary: updatedSummary,
+                  formattedSummary,
+                  options: {
+                    watermark: false,
+                    confidential: true,
+                    includeSignature: true,
+                    includeTimestamps: true
+                  }
+                })
               });
 
               if (response.ok) {
