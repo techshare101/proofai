@@ -13,18 +13,25 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Show loader while checking auth status
+  useEffect(() => {
+    if (!isLoading && session) {
+      router.replace('/dashboard'); // ✅ This ensures clean navigation
+    }
+  }, [isLoading, session, router]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="h-12 w-12 border-2 border-indigo-500 rounded-full animate-spin"></div>
+        <div className="text-center">
+          <div className="mb-4">
+            <div className="h-12 w-12 border-2 border-indigo-500 rounded-full animate-spin inline-block"></div>
+          </div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
       </div>
     );
   }
 
-  // Redirect is handled by AuthContext
-
-  // Prevent form submission if already logged in
   if (session) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -43,18 +50,13 @@ export default function LoginPage() {
     try {
       setLoading(true);
       setError('');
-      console.log('🔑 Attempting login for:', email);
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       
-      if (error) {
-        console.error('❌ Login error:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('✅ Login successful:', data.user?.email);
       // Auth state change will trigger redirect
     } catch (err) {
-      console.error('❌ Login error:', err);
+      console.error('Login error:', err);
       setError(err.message || 'Failed to login. Please try again.');
     } finally {
       setLoading(false);
