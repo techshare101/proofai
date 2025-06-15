@@ -54,33 +54,35 @@ export default function Recorder() {
     const maxRetries = 3;
     const retryDelay = 1000;
 
-    if (!videoRef.current) return;
-
     const init = async () => {
       if (!mounted) return;
       try {
         await initializeCamera();
       } catch (err) {
+        console.warn('Camera initialization error:', err);
         if (retryCount < maxRetries) {
           retryCount++;
           if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
           retryTimeoutRef.current = setTimeout(init, retryDelay);
         } else {
           setError('Failed to initialize camera after multiple attempts.');
+          setStatus('error');
         }
       }
     };
 
-    setTimeout(() => {
-      if (mounted && videoRef.current) init();
+    // Small delay to ensure DOM is ready
+    const timer = setTimeout(() => {
+      if (mounted) init();
     }, 100);
 
     return () => {
       mounted = false;
       if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+      clearTimeout(timer);
       cleanupStream();
     };
-  }, [videoRef.current]);
+  }, []);
 
   const initializeCamera = async () => {
     setStatus('requesting');
@@ -116,20 +118,27 @@ export default function Recorder() {
   };
 
   const cleanupStream = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => {
-        track.stop();
-        streamRef.current?.removeTrack(track);
-      });
-      streamRef.current = null;
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => {
+          track.stop();
+          streamRef.current?.removeTrack(track);
+        });
+        streamRef.current = null;
+      }
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+        videoRef.current.load();
+      }
+
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+    } catch (err) {
+      console.warn('Error cleaning up stream:', err);
     }
 
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-      videoRef.current.load();
-    }
-
-    if (mediaRecorder?.state !== 'inactive') mediaRecorder.stop();
     setMediaRecorder(null);
     setRecording(false);
     setStatus('idle');
