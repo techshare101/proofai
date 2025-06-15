@@ -39,16 +39,17 @@ export async function middleware(request: NextRequest) {
   // Get session
   const { data: { session } } = await supabase.auth.getSession();
   
-  // Check if the route is protected
-  const isProtectedRoute = request.nextUrl.pathname.startsWith('/dashboard');
-  const isAuthRoute = request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup';
+  // Define protected and auth routes
+  const protectedRoutes = ['/dashboard', '/recorder'];
+  const isProtectedRoute = protectedRoutes.some(route => request.nextUrl.pathname.startsWith(route));
+  const isAuthRoute = ['/login', '/signup'].includes(request.nextUrl.pathname);
   
-  // Handle protected routes
+  // Handle protected routes - redirect to login if not authenticated
   if (isProtectedRoute && !session) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
   
-  // Redirect to dashboard if user is already authenticated and trying to access auth routes
+  // Redirect to dashboard if authenticated user tries to access auth routes
   if (isAuthRoute && session) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
