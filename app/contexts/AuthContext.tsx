@@ -34,51 +34,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Handle redirects based on auth state
   useEffect(() => {
-    if (isLoading) {
-      console.log('⏳ Still loading, skipping redirect');
-      return;
-    }
-
-    if (isRedirecting) {
-      console.log('🔄 Already redirecting, skipping');
-      return;
-    }
-
-    const handleAuthRedirect = async () => {
-      if (session) {
-        // If user is logged in and on auth pages, redirect to dashboard
-        if (['/login', '/signup', '/'].includes(pathname)) {
-          console.log('🎯 User logged in on auth page, redirecting to dashboard');
+    if (!isLoading && !isRedirecting) {
+      const handleAuthRedirect = async () => {
+        if (session && ['/login', '/signup', '/'].includes(pathname)) {
           setIsRedirecting(true);
           try {
-            await router.push('/dashboard');
+            await router.replace('/dashboard');
           } catch (err) {
-            console.error('❌ Redirect error:', err);
+            console.error('Redirect error:', err);
           } finally {
             setIsRedirecting(false);
           }
-        } else {
-          console.log('✅ User logged in on allowed page:', pathname);
-        }
-      } else {
-        // If not authenticated and trying to access protected routes
-        if (pathname.startsWith('/dashboard')) {
-          console.log('🔒 Unauthenticated user on protected route, redirecting to home');
+        } else if (!session && pathname.startsWith('/dashboard')) {
           setIsRedirecting(true);
           try {
-            await router.push('/');
+            await router.replace('/login');
           } catch (err) {
-            console.error('❌ Redirect error:', err);
+            console.error('Redirect error:', err);
           } finally {
             setIsRedirecting(false);
           }
-        } else {
-          console.log('✅ Unauthenticated user on allowed page:', pathname);
         }
-      }
-    };
+      };
 
-    handleAuthRedirect();
+      handleAuthRedirect();
+    }
   }, [session, pathname, isLoading, router, isRedirecting]);
 
   // Initialize auth and handle session changes
@@ -87,49 +67,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const getSession = async () => {
       try {
-        console.log('🔄 Getting initial session...');
         const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('❌ Session error:', error);
-          return;
-        }
-
+        if (error) throw error;
         if (!mounted) return;
-
-        if (session) {
-          console.log('✅ Session retrieved:', session.user?.email);
-          setSession(session);
-        } else {
-          console.log('⚠️ No session found');
-          setSession(null);
-        }
+        setSession(session);
       } catch (err) {
-        console.error('❌ Session error:', err);
+        console.error('Session error:', err);
       } finally {
-        if (mounted) {
-          setIsLoading(false);
-        }
+        if (mounted) setIsLoading(false);
       }
     };
 
     getSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔁 Auth state changed:', event, session ? session.user?.email : 'no session');
-      
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
-
-      if (event === 'SIGNED_IN') {
-        console.log('🎉 User signed in');
-        setSession(session);
-      } else if (event === 'SIGNED_OUT') {
-        console.log('👋 User signed out');
-        setSession(null);
-      } else if (event === 'TOKEN_REFRESHED') {
-        console.log('🔄 Token refreshed');
-        setSession(session);
-      }
+      setSession(session);
     });
 
     return () => {
