@@ -31,38 +31,49 @@ export interface Report {
   };
 }
 
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Check if we're running on the client side
+const isClient = typeof window !== 'undefined';
+
+// Use appropriate environment variables based on context
+const supabaseUrl = isClient
+  ? process.env.NEXT_PUBLIC_SUPABASE_URL
+  : process.env.SUPABASE_URL;
+
+const supabaseKey = isClient
+  ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  : process.env.SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
   console.error('❌ Missing Supabase environment variables');
   throw new Error(
-    'Supabase configuration is missing. Please check your environment variables.'
+    `Supabase configuration is missing. Please check your ${isClient ? 'client-side' : 'server-side'} environment variables.`
   );
 }
 
-console.log('✅ Initializing Supabase client...');
-export const supabase = createClient(supabaseUrl, supabaseKey, {
+console.log(`✅ Initializing Supabase ${isClient ? 'client' : 'server'} instance...`);
+
+export const supabase = new SupabaseClient<Database>(supabaseUrl, supabaseKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
   }
 });
 
-// Helper functions for database operations
+// ─────────────────────────────────────────────
+// 🔧 Helper Functions
+// ─────────────────────────────────────────────
+
 export async function saveRecording(blob: Blob, title: string): Promise<Recording | null> {
   try {
-    // 1. Upload the recording file to storage
     const filename = `${Date.now()}-${title}.webm`;
+
     const { data: storageData, error: storageError } = await supabase.storage
       .from('recordings')
       .upload(filename, blob);
 
     if (storageError) throw storageError;
 
-    // 2. Create database entry
     const { data, error: dbError } = await supabase
       .from('recordings')
       .insert({
@@ -101,7 +112,12 @@ export async function saveSummary(recordingId: string, content: string, keywords
   }
 }
 
-export async function saveReport(recordingId: string, summaryId: string, pdfUrl: string, metadata: Report['metadata']): Promise<Report | null> {
+export async function saveReport(
+  recordingId: string,
+  summaryId: string,
+  pdfUrl: string,
+  metadata: Report['metadata']
+): Promise<Report | null> {
   try {
     const { data, error } = await supabase
       .from('reports')
@@ -121,32 +137,3 @@ export async function saveReport(recordingId: string, summaryId: string, pdfUrl:
     return null;
   }
 }
-
-// SQL for creating tables:
-/*
-create table recordings (
-  id uuid default uuid_generate_v4() primary key,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  title text not null,
-  duration integer not null,
-  storage_path text not null,
-  transcript text
-);
-
-create table summaries (
-  id uuid default uuid_generate_v4() primary key,
-  recording_id uuid references recordings(id) not null,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  content text not null,
-  keywords text[] not null
-);
-
-create table reports (
-  id uuid default uuid_generate_v4() primary key,
-  recording_id uuid references recordings(id) not null,
-  summary_id uuid references summaries(id) not null,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  pdf_url text not null,
-  metadata jsonb not null
-);
-*/
