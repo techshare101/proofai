@@ -32,11 +32,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, [session, isLoading, isRedirecting, pathname]);
 
+  // List of protected routes that require auth
+  const protectedRoutes = ['/dashboard', '/recorder'];
+  const authRoutes = ['/login', '/signup', '/'];
+
   // Handle redirects based on auth state
   useEffect(() => {
     if (!isLoading && !isRedirecting) {
       const handleAuthRedirect = async () => {
-        if (session && ['/login', '/signup', '/'].includes(pathname)) {
+        // If logged in and on an auth page, redirect to dashboard
+        if (session && authRoutes.includes(pathname)) {
           setIsRedirecting(true);
           try {
             await router.replace('/dashboard');
@@ -45,7 +50,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } finally {
             setIsRedirecting(false);
           }
-        } else if (!session && pathname.startsWith('/dashboard')) {
+        }
+        // If not logged in and trying to access protected route, redirect to login
+        else if (!session && protectedRoutes.some(route => pathname.startsWith(route))) {
           setIsRedirecting(true);
           try {
             await router.replace('/login');
