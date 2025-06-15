@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from './contexts/AuthContext';
 
 // Import components
 import Hero from '@/components/Hero';
@@ -14,44 +13,16 @@ import Footer from '@/components/Footer';
 
 
 export default function Home() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
+  const { isLoading } = useAuth();
 
-  // Check for authenticated user and redirect if found
-  useEffect(() => {
-    const checkUser = async () => {
-      setLoading(true);
-      const { data } = await supabase.auth.getSession();
-      
-      if (data.session) {
-        // User is signed in, redirect to dashboard
-        router.push('/dashboard');
-      } else {
-        // No authenticated user
-        setLoading(false);
-      }
-    };
-    
-    checkUser();
-
-    // Set up auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
-        router.push('/dashboard');
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [router]);
-
-  // Show loading state while checking auth
-  if (loading) {
+  // During loading or SSR, show loading indicator
+  if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-      </div>
+      <main className="flex min-h-screen flex-col">
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="h-12 w-12 border-2 border-indigo-500 rounded-full animate-spin"></div>
+        </div>
+      </main>
     );
   }
 
