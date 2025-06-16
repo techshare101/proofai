@@ -48,7 +48,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isLoading) return;
 
-    if (!session && pathname !== '/login') {
+    // Allow unauthenticated users to stay on the landing page ('/')
+    if (!session && pathname !== '/login' && pathname !== '/') {
       router.push('/login');
     }
 
