@@ -292,26 +292,12 @@ export async function uploadRecording(audioBlob: Blob, location: string): Promis
 
     console.log('💾 Saved to Supabase with full transcript intelligence.');
 
-    // Get the public URL for the PDF from reports bucket
-    let pdfFilename = pdfResult;
-    // If pdfResult is a URL, extract just the filename
-    if (pdfResult.startsWith('http')) {
-      pdfFilename = pdfResult.split('/').pop() || pdfResult;
-    }
-    const { data: publicUrl } = supabase.storage
-      .from('reports')
-      .getPublicUrl(pdfFilename);
-
-    if (!publicUrl?.publicUrl) {
-      console.error('❌ Failed to get PDF public URL');
-      const err = new Error('Failed to get PDF public URL') as UploadError;
-      err.stage = 'pdf';
-      throw err;
-    }
-
-    console.log('✅ PDF public URL:', publicUrl.publicUrl);
-
-    const finalUrl = publicUrl?.publicUrl || '';
+    // Handle the PDF URL returned directly from ClientPDFService
+    // pdfResult is now already a complete URL (object URL or direct download URL)
+    console.log('✅ PDF URL received:', pdfResult);
+    
+    // No need to get from Supabase storage since the PDF is returned directly
+    const finalUrl = pdfResult || '';
     console.log('📄 Returning PDF URL:', finalUrl);
 
     return {

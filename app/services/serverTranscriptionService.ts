@@ -54,12 +54,43 @@ export class ServerTranscriptionService {
         detectedLanguage: translateToEnglish ? undefined : language || 'auto',
       };
     } catch (error: any) {
-      console.error('❌ Server transcription error:', error);
+      // Log detailed error information for debugging
+      console.error('❌ Server transcription error:', {
+        message: error.message,
+        status: error.status,
+        statusCode: error.statusCode,
+        code: error.code,
+        type: error.type,
+        param: error.param,
+        stack: error.stack,
+        response: error.response ? {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data
+        } : null,
+        apiKey: process.env.OPENAI_API_KEY ? 
+          `${process.env.OPENAI_API_KEY.substring(0, 7)}...${process.env.OPENAI_API_KEY.substring(process.env.OPENAI_API_KEY.length - 5)}` : 
+          'Missing'
+      });
       
       // Handle rate limit errors
       if (error?.status === 429 || error?.message?.includes('exceeded your current quota')) {
         throw new Error(
           'API rate limit exceeded. Please try again in a few minutes or contact support if this persists.'
+        );
+      }
+
+      // Handle OpenAI API authentication errors
+      if (error?.status === 401 || error?.message?.includes('auth') || error?.message?.includes('key')) {
+        throw new Error(
+          'OpenAI API authentication failed. Please check your API key configuration.'
+        );
+      }
+
+      // Handle file size errors
+      if (error?.message?.includes('file too large') || error?.message?.includes('size')) {
+        throw new Error(
+          'The audio file is too large for transcription. Please try a shorter recording.'
         );
       }
 
@@ -70,7 +101,7 @@ export class ServerTranscriptionService {
         );
       }
 
-      throw new Error('Transcription failed. Please try again.');
+      throw new Error(`Transcription failed. Please try again. Details: ${error.message}`);
     }
   }
 }

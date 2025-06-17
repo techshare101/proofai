@@ -106,8 +106,23 @@ export class ClientPDFService {
       }
     }
 
-    const result = await response.json();
-    const cleanUrl = result.url?.replace(/([^:])\/{2,}/g, '$1/');
-    return cleanUrl;
+    // Handle direct PDF response instead of JSON
+    const contentType = response.headers.get('Content-Type');
+    if (contentType && contentType.includes('application/pdf')) {
+      // For direct PDF response, create an object URL and return it
+      const pdfBlob = await response.blob();
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      return pdfUrl;
+    } else {
+      // Fallback to previous behavior for backward compatibility
+      try {
+        const result = await response.json();
+        const cleanUrl = result.url?.replace(/([^:])\/\{2,\}/g, '$1/');
+        return cleanUrl;
+      } catch (error) {
+        console.error('Failed to parse response as JSON:', error);
+        throw new Error('Invalid response format from PDF generation service');
+      }
+    }
   }
 }
