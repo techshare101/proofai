@@ -3,6 +3,13 @@ import { ServerTranscriptionService } from '../../services/serverTranscriptionSe
 import { supabase } from '../../lib/supabase';
 
 export async function POST(request: NextRequest) {
+  // Debug: Log environment variables
+  console.log('API Environment check:', {
+    hasOpenAIKey: !!process.env.OPENAI_API_KEY,
+    keyPrefix: process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.substring(0, 7) : 'missing',
+    allEnvKeys: Object.keys(process.env).filter(key => !key.includes('PASSWORD') && !key.includes('TOKEN')),
+    nodeEnv: process.env.NODE_ENV
+  });
   try {
     // Get the audio file from the request
     const formData = await request.formData();

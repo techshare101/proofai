@@ -1,5 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  env: {
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    GEOCODE_API_KEY: process.env.GEOCODE_API_KEY,
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  },
   reactStrictMode: true,
   poweredByHeader: false,
   output: 'standalone',
@@ -41,7 +48,17 @@ const nextConfig = {
       zlib: require.resolve('browserify-zlib'),
       util: require.resolve('util/'),
       buffer: require.resolve('buffer/'),
+      process: false
     };
+
+    // Add buffer polyfill
+    const webpack = require('webpack');
+    config.plugins.push(
+      new webpack.ProvidePlugin({
+        Buffer: ['buffer', 'Buffer'],
+        process: 'process/browser',
+      })
+    );
 
     // Exclude problematic files
     config.module.rules.push({

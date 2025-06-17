@@ -1,6 +1,11 @@
 // app/api/geocode/route.ts
 export async function POST(req: Request) {
   const { lat, lng } = await req.json();
+  console.log('Geocoding API check:', {
+    envKeys: Object.keys(process.env).filter(key => !key.includes('KEY') && !key.includes('TOKEN')),
+    hasKey: !!process.env.GEOCODE_API_KEY,
+    coords: { lat, lng }
+  });
   const apiKey = process.env.GEOCODE_API_KEY;
   if (!apiKey) {
     console.error("Missing GEOCODE_API_KEY environment variable");

@@ -5,8 +5,15 @@ import { NextResponse } from "next/server";
 import { generatePDF } from '@/utils/generatePDF'; // Adjusted import path
 
 // Initialize Supabase securely using env vars
+// Debug environment variables
+console.log('PDF API Environment check:', {
+  hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+  hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+  envKeys: Object.keys(process.env).filter(key => !key.includes('KEY') && !key.includes('TOKEN'))
+});
+
 const supabase = createClient(
-  process.env.SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
