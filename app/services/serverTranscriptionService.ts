@@ -1,8 +1,12 @@
 import OpenAI from 'openai';
+import { resolveLanguageLabel } from '../utils/detectLanguage';
 
 export interface TranscriptionResult {
   text: string;
   detectedLanguage?: string;
+  languageCode: string;
+  languageLabel: string;
+  correctedFrom: string | null;
 }
 
 export class ServerTranscriptionService {
@@ -48,10 +52,30 @@ export class ServerTranscriptionService {
 
       console.log('✅ Transcription complete');
 
+      // Extract the detected language code from Whisper response
+      // The language property is only available for transcriptions, not translations
+      const detectedCode = translateToEnglish ? 
+        (language || 'en') : // If translating, use provided language or default to English
+        ('language' in response ? response.language as string : (language || 'en')); // For transcriptions
+      const detectedLabel = resolveLanguageLabel(detectedCode);
+      
+      // Determine if language was corrected
+      const originalLabel = language ? resolveLanguageLabel(language) : null;
+      const wasLanguageCorrected = language !== '' && detectedCode !== language;
+      
+      console.log('🌐 Language detection:', {
+        provided: language || 'auto',
+        detected: detectedCode,
+        label: detectedLabel,
+        corrected: wasLanguageCorrected ? originalLabel : null
+      });
+      
       return {
         text: response.text,
-        // OpenAI API doesn't return language for translations
         detectedLanguage: translateToEnglish ? undefined : language || 'auto',
+        languageCode: detectedCode,
+        languageLabel: detectedLabel,
+        correctedFrom: wasLanguageCorrected ? originalLabel : null
       };
     } catch (error: any) {
       // Log detailed error information for debugging

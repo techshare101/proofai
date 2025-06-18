@@ -8,6 +8,8 @@ import SummaryCard from '../components/SummaryCard';
 import { supabase } from '../lib/supabase';
 import { generateSummaryPDF } from '../lib/pdf';
 
+export const dynamic = 'force-dynamic';
+
 export default function SummaryPage() {
   const searchParams = useSearchParams();
   const videoUrl = searchParams.get('videoUrl');
@@ -18,6 +20,19 @@ export default function SummaryPage() {
   const [userLocation, setUserLocation] = useState<string>('Brooklyn, NY');
 
   useEffect(() => {
+    // Check for required environment variables
+    if (!process.env.SUPABASE_SERVICE_KEY) {
+      console.error('❌ Missing SUPABASE_SERVICE_KEY environment variable');
+      // Handle the missing variable gracefully
+      setError('Configuration issue detected. Please contact support.');
+    }
+    
+    // Only use service key on the server side, not during build
+    if (typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
+      // Your Supabase service key logic here
+      console.log('🔑 Running server-side Supabase service key logic in production');
+    }
+    
     const OPENCAGE_API_KEY = process.env.NEXT_PUBLIC_OPENCAGE_API_KEY;
     console.log('🔑 OpenCage API Key exists:', !!OPENCAGE_API_KEY);
 

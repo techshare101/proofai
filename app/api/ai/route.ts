@@ -18,7 +18,7 @@ export async function POST(request: Request) {
           messages: [
             { 
               role: 'user', 
-              content: `Identify the ISO 639-1 language code (e.g., "en", "fr", "es") of the following text:\n\n"${text.slice(0, 400)}"` 
+              content: `You are a language identification expert. Identify the ISO 639-1 language code of the following text. Be especially careful to distinguish between German (de) and Spanish (es), as they may have similar patterns.\n\nCommon codes: English (en), French (fr), Spanish (es), German (de), Italian (it), Portuguese (pt), Russian (ru), Chinese (zh), Japanese (ja)\n\nText: "${text.slice(0, 600)}"\n\nRespond with ONLY the two-letter language code.` 
             }
           ]
         });

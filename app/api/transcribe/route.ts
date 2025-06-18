@@ -38,6 +38,32 @@ export async function POST(request: NextRequest) {
       translateToEnglish
     );
 
+    // Store transcript data in Supabase if we're in a production environment
+    if (process.env.NODE_ENV === 'production' && process.env.SUPABASE_SERVICE_KEY) {
+      try {
+        const transcriptData = {
+          text: result.text,
+          languageCode: result.languageCode,
+          languageLabel: result.languageLabel,
+          correctedFrom: result.correctedFrom,
+          createdAt: new Date().toISOString()
+        };
+        
+        // Save to Supabase
+        const { error } = await supabase
+          .from('transcriptions')
+          .insert(transcriptData);
+        
+        if (error) {
+          console.error('❌ Error saving transcript to Supabase:', error);
+        } else {
+          console.log('✅ Transcript saved to Supabase');
+        }
+      } catch (dbError) {
+        console.error('❌ Database error:', dbError);
+      }
+    }
+
     return NextResponse.json(result);
   } catch (error: any) {
     console.error('Transcription API error:', error);
