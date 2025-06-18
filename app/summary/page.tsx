@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { generateVideoSummary } from '../lib/summaryClient';
 import type { SummaryResult } from '../types';
 import SummaryCard from '../components/SummaryCard';
-import { supabase } from '../lib/supabase';
+import { getAnonSupabaseClient } from '../lib/supabase';
 import { generateSummaryPDF } from '../lib/pdf';
 
 export const dynamic = 'force-dynamic';
@@ -161,6 +161,7 @@ export default function SummaryPage() {
         const encodedFileUrl = encodeURIComponent(videoUrl);
 
         // Save summary and report relevance back to Supabase
+        const supabase = getAnonSupabaseClient();
         const { data: updateData, error: updateError } = await supabase
           .from('recordings')
           .update(updatePayload)
