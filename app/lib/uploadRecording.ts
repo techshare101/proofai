@@ -243,7 +243,7 @@ export async function uploadRecording(audioBlob: Blob, location: string): Promis
 
     // 10. Generate signed URL for the recording video
     console.log('📹 Creating signed URL for video recording...');
-    const { data: signedUrlData, error: signedUrlError } = await supabase
+    const { data: signedUrlData, error: signedUrlError } = await getAnonSupabaseClient()
       .storage
       .from('recordings')
       .createSignedUrl(filename, 60 * 60 * 24 * 7); // Valid for 7 days
