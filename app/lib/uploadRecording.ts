@@ -184,9 +184,13 @@ export async function uploadRecording(audioBlob: Blob, location: string): Promis
       throw err;
     }
 
-    // 6. Get transcript from Whisper API
+    // 6. Get transcript from Whisper API using the signed URL
+    // We'll use the signed URL to avoid uploading the large blob through the API
     const transcriptionService = await TranscriptionService.getInstance();
-    const transcriptionResult = await transcriptionService.transcribe(audioBlob);
+    console.log('🎙️ Starting transcription using signed URL instead of blob to bypass size limits');
+    
+    // Send the signed URL to the transcription service instead of the blob
+    const transcriptionResult = await transcriptionService.transcribe(signedUrl);
     const transcript = transcriptionResult.text;
     console.log('🎙️ Whisper Transcript:', transcript);
 

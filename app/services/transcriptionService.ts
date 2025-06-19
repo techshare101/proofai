@@ -33,51 +33,46 @@ export class TranscriptionService {
     return TranscriptionService.instance;
   }
 
-  public async transcribe(audioBlob: Blob, language = '', translateToEnglish = false): Promise<TranscriptionResult> {
+  public async transcribe(audioInput: Blob | string, language = '', translateToEnglish = false): Promise<TranscriptionResult> {
     console.log('🎙️ Starting Whisper transcription...', {
-      blobType: audioBlob.type,
-      blobSize: `${(audioBlob.size / 1024 / 1024).toFixed(2)} MB`,
+      inputType: typeof audioInput === 'string' ? 'URL' : 'Blob',
+      blobType: typeof audioInput !== 'string' ? audioInput.type : 'N/A',
+      blobSize: typeof audioInput !== 'string' ? `${(audioInput.size / 1024 / 1024).toFixed(2)} MB` : 'N/A',
       language: language || 'auto-detect'
     });
     try {
-      // Convert Blob to File with appropriate extension based on type
-      const extension = audioBlob.type === 'video/webm' ? 'webm' : 'mp4';
-      const audioFile = new File([audioBlob], `audio.${extension}`, { type: audioBlob.type });
+      let formDataForAPI = new FormData();
       
-      // Log file details
-      console.log('🎙️ Audio file details:', {
-        name: audioFile.name,
-        type: audioFile.type,
-        size: `${(audioFile.size / 1024 / 1024).toFixed(2)} MB`,
-        extension
-      });
-
-      const formData = new FormData();
-      formData.append('file', audioFile);
-      formData.append('model', 'whisper-1');
-      
-      // Only send language if it's specified and not translating
-      if (language && !translateToEnglish) {
-        formData.append('language', language);
+      // Handle both Blob and URL inputs
+      if (typeof audioInput === 'string') {
+        // If input is a URL, pass it directly to the API
+        console.log('🎙️ Using audio URL:', audioInput.substring(0, 100) + '...');
+        formDataForAPI.append('fileUrl', audioInput);
+      } else {
+        // Handle as Blob - convert to File first
+        const extension = audioInput.type === 'video/webm' ? 'webm' : 'mp4';
+        const audioFile = new File([audioInput], `audio.${extension}`, { type: audioInput.type });
+        
+        // Log file details
+        console.log('🎙️ Audio file details:', {
+          name: audioFile.name,
+          type: audioFile.type,
+          size: `${(audioFile.size / 1024 / 1024).toFixed(2)} MB`,
+          extension
+        });
+        
+        formDataForAPI.append('file', audioFile);
       }
 
-      // Choose endpoint based on translation flag
-      const endpoint = translateToEnglish
-        ? 'https://api.openai.com/v1/audio/translations'
-        : 'https://api.openai.com/v1/audio/transcriptions';
-
+      // Add common parameters
       console.log('💿 Sending to Whisper API:', {
-        fileName: audioFile.name,
-        fileSize: `${(audioFile.size / 1024 / 1024).toFixed(2)} MB`,
-        fileType: audioFile.type,
+        inputType: typeof audioInput === 'string' ? 'URL' : 'File',
+        fileType: typeof audioInput !== 'string' ? audioInput.type : 'from URL',
         language: language || 'auto',
-        endpoint: translateToEnglish ? 'translations' : 'transcriptions',
+        endpoint: 'transcriptions',
         apiKey: this.apiKey ? 'Set' : 'Missing'
       });
-
-      // Call our transcription API route
-      const formDataForAPI = new FormData();
-      formDataForAPI.append('file', audioFile);
+      // Add optional parameters
       if (language) {
         formDataForAPI.append('language', language);
       }

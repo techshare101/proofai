@@ -11,22 +11,53 @@ export async function POST(request: NextRequest) {
     nodeEnv: process.env.NODE_ENV
   });
   try {
-    // Get the audio file from the request
+    // Get either the audio file or URL from the request
     const formData = await request.formData();
-    const audioFile = formData.get('file') as File;
+    
+    // Check if we're receiving a file URL instead of a file
+    const fileUrl = formData.get('fileUrl') as string;
     const language = formData.get('language') as string;
     const translateToEnglish = formData.get('translateToEnglish') === 'true';
-
-    if (!audioFile) {
-      return NextResponse.json(
-        { error: 'No audio file provided' },
-        { status: 400 }
-      );
+    
+    let audioBlob: Blob;
+    
+    if (fileUrl) {
+      // If we have a URL, fetch the file
+      console.log('🔄 Fetching audio from URL:', fileUrl.substring(0, 50) + '...');
+      const response = await fetch(fileUrl);
+      
+      if (!response.ok) {
+        return NextResponse.json(
+          { error: `Failed to fetch audio from URL: ${response.status} ${response.statusText}` },
+          { status: 502 }
+        );
+      }
+      
+      // Convert to blob
+      const buffer = await response.arrayBuffer();
+      audioBlob = new Blob([buffer], { type: response.headers.get('content-type') || 'audio/webm' });
+      
+      console.log('✅ Successfully fetched audio file:', {
+        size: `${(audioBlob.size / 1024 / 1024).toFixed(2)} MB`,
+        type: audioBlob.type
+      });
+    } else {
+      // Get the audio file from the request
+      const audioFile = formData.get('file') as File;
+      
+      if (!audioFile) {
+        return NextResponse.json(
+          { error: 'No audio file or URL provided' },
+          { status: 400 }
+        );
+      }
+      
+      // Convert File to Blob for OpenAI API
+      const audioBuffer = await audioFile.arrayBuffer();
+      audioBlob = new Blob([audioBuffer], { type: audioFile.type });
     }
 
-    // Convert File to Blob for OpenAI API
-    const audioBuffer = await audioFile.arrayBuffer();
-    const audioBlob = new Blob([audioBuffer], { type: audioFile.type });
+    // audioBlob is now prepared from either file upload or URL fetch
 
     // Initialize server-side transcription service
     const transcriptionService = ServerTranscriptionService.getInstance();
