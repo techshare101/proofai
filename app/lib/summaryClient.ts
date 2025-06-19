@@ -1,13 +1,13 @@
 import type { SummaryResult } from '../types';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SERVICE_ROLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;
-
-if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-  throw new Error('Missing Supabase environment variables');
-}
-
 export async function generateVideoSummary(videoUrl: string, transcript?: string): Promise<SummaryResult> {
+  const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const SERVICE_ROLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+    throw new Error('Missing Supabase environment variables');
+  }
+
   try {
     // Use fallback transcript if none provided
     const actualTranscript = transcript || "No transcript was available. Assume the video includes a workplace dispute with 2 individuals arguing in a hallway.";

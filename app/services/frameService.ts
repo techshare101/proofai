@@ -1,11 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+import { getAnonSupabaseClient } from '../lib/supabase';
 
 export class FrameService {
-  private static supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-
   public static async extractFrame(videoElement: HTMLVideoElement): Promise<string> {
     const canvas = document.createElement('canvas');
     canvas.width = videoElement.videoWidth;
@@ -30,8 +25,11 @@ export class FrameService {
       const filename = `frame_${Date.now()}.jpg`;
       const filePath = `frames/${filename}`;
 
+      // Use a fresh anon Supabase client for each call
+      const supabase = getAnonSupabaseClient();
+
       // Upload to Supabase Storage
-      const { data, error } = await this.supabase.storage
+      const { data, error } = await supabase.storage
         .from('video-frames')
         .upload(filePath, blob, {
           contentType: 'image/jpeg',
@@ -43,7 +41,7 @@ export class FrameService {
       }
 
       // Get public URL
-      const { data: { publicUrl } } = this.supabase.storage
+      const { data: { publicUrl } } = supabase.storage
         .from('video-frames')
         .getPublicUrl(filePath);
 

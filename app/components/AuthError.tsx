@@ -1,6 +1,6 @@
 'use client';
 
-import { supabase } from '@/lib/supabase';
+import { getAnonSupabaseClient } from '@/lib/supabase';
 
 export default function AuthError({ message }: { message: string }) {
   return (
@@ -12,9 +12,9 @@ export default function AuthError({ message }: { message: string }) {
         </div>
         <button
           onClick={async () => {
-            const { data: { session } } = await supabase.auth.getSession();
+            const { data: { session } } = await getAnonSupabaseClient().auth.getSession();
             if (!session) {
-              await supabase.auth.signOut();
+              await getAnonSupabaseClient().auth.signOut();
             }
             window.location.reload();
           }}

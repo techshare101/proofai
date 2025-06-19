@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ServerTranscriptionService } from '../../services/serverTranscriptionService';
-import { supabase } from '../../lib/supabase';
+import { getSupabaseClient } from '../../lib/supabase';
 
 export async function POST(request: NextRequest) {
   // Debug: Log environment variables
@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
         };
         
         // Save to Supabase
+        const supabase = getSupabaseClient();
         const { error } = await supabase
           .from('transcriptions')
           .insert(transcriptData);

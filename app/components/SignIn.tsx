@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { getAnonSupabaseClient } from '@/lib/supabase';
 
 export default function SignIn() {
   const [loading, setLoading] = useState(false);
@@ -10,7 +10,7 @@ export default function SignIn() {
   const handleSignIn = async () => {
     setLoading(true);
     
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    const { data, error } = await getAnonSupabaseClient().auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: 'http://localhost:3000/auth/v1/callback'

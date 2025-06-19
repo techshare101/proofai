@@ -48,7 +48,7 @@ const nextConfig = {
       zlib: require.resolve('browserify-zlib'),
       util: require.resolve('util/'),
       buffer: require.resolve('buffer/'),
-      process: false
+      process: require.resolve("process/browser")
     };
 
     // Add buffer polyfill

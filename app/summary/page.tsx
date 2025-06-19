@@ -1,16 +1,39 @@
-'use client';
+import { getSupabaseClient } from "@/lib/supabase";
 
-import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { generateVideoSummary } from '../lib/summaryClient';
-import type { SummaryResult } from '../types';
-import SummaryCard from '../components/SummaryCard';
-import { getAnonSupabaseClient } from '../lib/supabase';
-import { generateSummaryPDF } from '../lib/pdf';
+export const dynamic = "force-dynamic"; // Prevents static build
 
-export const dynamic = 'force-dynamic';
+export default async function SummaryPage() {
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from("recordings")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-export default function SummaryPage() {
+    if (error) {
+      console.error("Supabase error:", error);
+      return <div className="text-red-500">Error: {error.message}</div>;
+    }
+
+    return (
+      <div className="p-4">
+        <h2 className="text-xl font-bold mb-4">Recordings Summary</h2>
+        <ul className="space-y-3">
+          {data?.map((item) => (
+            <li key={item.id} className="bg-white p-3 rounded shadow">
+              <pre className="text-xs">{JSON.stringify(item, null, 2)}</pre>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  } catch (e: any) {
+    console.error("Runtime error in SummaryPage:", e.message);
+    return <div className="text-red-600">Error: {e.message}</div>;
+  }
+}
+
+
   const searchParams = useSearchParams();
   const videoUrl = searchParams.get('videoUrl');
 
@@ -93,67 +116,6 @@ export default function SummaryPage() {
         if (err instanceof GeolocationPositionError) {
           switch(err.code) {
             case err.PERMISSION_DENIED:
-              console.log('🚫 Location permission denied, trying IP fallback...');
-              break;
-            case err.POSITION_UNAVAILABLE:
-              console.log('❌ Location unavailable, trying IP fallback...');
-              break;
-            case err.TIMEOUT:
-              console.log('⏰ Location timed out, trying IP fallback...');
-              break;
-          }
-        }
-        await getLocationFromIP();
-      }
-    };
-
-    getLocation();
-  }, []);
-
-  const fetchSummary = async () => {
-      // Only fetch if we don't already have a summary and have a video URL
-      if (!videoUrl) {
-        setLoading(false);
-        return;
-      }
-
-      // Prevent fetching if we already have a summary for this video
-      if (summary?.summary) {
-        console.log('✅ Summary already exists:', summary.summary.substring(0, 100) + '...');
-        return;
-      }
-
-      setLoading(true);
-      setError('');
-
-      console.log('🔍 Analyzing video:', videoUrl);
-      
-      try {
-        const result = await generateVideoSummary(videoUrl);
-        
-        if (!result) {
-          throw new Error('Failed to generate summary');
-        }
-
-        // Validate result before setting state
-        if (result.summary?.trim()) {
-          console.log('✅ New summary generated:', result.summary.substring(0, 100) + '...');
-          // Ensure transcript is included in summary state
-          setSummary({
-            ...result,
-            transcript: result.transcript || result.notableQuotes?.join('\n\n')
-          });
-        } else {
-          console.error('❌ Generated summary is empty or invalid:', result);
-          throw new Error('Generated summary is empty or invalid');
-        }
-
-        // Prepare update payload - only include fields we know exist
-        const updatePayload = {
-          summary: result.summary,
-          legal_relevance: result.reportRelevance?.legal || false,
-          hr_relevance: result.reportRelevance?.hr || false
-        };
 
         console.log('🧾 PATCH Payload:', updatePayload);
 
