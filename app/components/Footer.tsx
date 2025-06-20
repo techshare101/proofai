@@ -13,8 +13,8 @@ export default function Footer() {
               <span className="text-2xl font-bold">ProofAI</span>
             </div>
             <p className="text-gray-300 mb-4 max-w-md">
-              Secure video evidence and instant legal reports for workers and citizens.
-              Document your truth with ProofAI.
+              Secure video evidence and instant legal reports for workers, citizens, and truth seekers.
+              Built for justice, powered by you.
             </p>
             <div className="flex space-x-4">
               <a href="#" className="text-gray-400 hover:text-white">
@@ -88,9 +88,15 @@ export default function Footer() {
         </div>
         
         <div className="mt-12 border-t border-gray-800 pt-8">
-          <p className="text-base text-gray-400 text-center">
-            &copy; {currentYear} ProofAI. All rights reserved.
-          </p>
+          <div className="text-base text-gray-400 text-center space-y-2">
+            <p className="mb-2">
+              🔖 Humanitarian Project — Every subscription supports access for others.<br/>
+              ❤️ Built with love by volunteers.
+            </p>
+            <p>
+              &copy; {currentYear} ProofAI. All rights reserved MetalMindTech.
+            </p>
+          </div>
         </div>
       </div>
     </footer>

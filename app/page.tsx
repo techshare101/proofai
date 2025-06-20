@@ -5,9 +5,11 @@ import { useAuth } from './contexts/AuthContext';
 
 // Import components
 import Hero from '@/components/Hero';
+import FeaturesEmpower from '@/components/FeaturesEmpower';
 import HowItWorks from '@/components/HowItWorks';
 import EmotionalHook from '@/components/EmotionalHook';
 import DemoReportPreview from '@/components/DemoReportPreview';
+import WhoIsItFor from '@/components/WhoIsItFor';
 import Pricing from '@/components/Pricing';
 import Footer from '@/components/Footer';
 
@@ -31,6 +33,9 @@ export default function Home() {
       {/* Hero Section */}
       <Hero />
       
+      {/* Features That Empower */}
+      <FeaturesEmpower />
+      
       {/* How It Works */}
       <HowItWorks />
       
@@ -39,6 +44,9 @@ export default function Home() {
       
       {/* Demo Report Preview */}
       <DemoReportPreview />
+      
+      {/* Who Is It For */}
+      <WhoIsItFor />
       
       {/* Pricing */}
       <Pricing />

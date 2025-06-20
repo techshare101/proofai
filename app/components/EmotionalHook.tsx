@@ -5,7 +5,7 @@ export default function EmotionalHook() {
     <section className="py-16 bg-indigo-900 text-white">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl mb-6">
-          For the voiceless. The disrespected. The overworked.
+          For the Voiceless. The Disrespected. The Overworked.
         </h2>
         <p className="text-xl leading-relaxed">
           Because if it didn't happen on ProofAI, it didn't happen.

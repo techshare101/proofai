@@ -11,7 +11,7 @@ export default function DemoReportPreview() {
             Professional Legal Reports
           </h2>
           <p className="mt-4 max-w-2xl mx-auto text-xl text-gray-500">
-            See how ProofAI transforms your evidence into court-ready documentation.
+            See how ProofAI transforms your evidence into structured legal documentation.
           </p>
         </div>
 

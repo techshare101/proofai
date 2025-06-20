@@ -68,7 +68,7 @@ export default function Hero() {
                 </h1>
               </div>
               <p className="text-lg md:text-xl text-white/90 mt-4">
-                🧾 Document truth. Defend dignity. Create instant legal proof with video.
+                Secure video evidence and instant legal proof for workers, citizens, and defenders of justice.
               </p>
             </motion.div>
             
@@ -82,7 +82,7 @@ export default function Hero() {
                 href="/recorder"
                 className="bg-white text-purple-700 font-semibold px-6 py-3 rounded-lg shadow hover:bg-gray-100 transition flex items-center justify-center"
               >
-                🎥 Start Recording
+                🎥 Prove Your Truth. Protect Your Rights. Record Now.
               </Link>
               <a
                 href="#features"

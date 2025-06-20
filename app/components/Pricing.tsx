@@ -5,34 +5,79 @@ import Link from 'next/link';
 export default function Pricing() {
   const tiers = [
     {
-      name: 'Free',
+      name: '🕊️ Starter',
       price: '$0',
-      description: 'Basic protection for individuals',
+      period: 'mo',
+      description: '3 recordings/month, 7-day storage, watermark included',
       features: [
-        '5 video recordings per month',
-        'Basic AI summary',
-        'PDF report generation',
-        'Video evidence storage (7 days)',
+        '3 recordings per month',
+        '7-day evidence storage',
+        'Basic PDF reports',
+        'ProofAI watermark',
         'Email support'
       ],
       buttonText: 'Start for Free',
       highlight: false
     },
     {
-      name: 'Pro',
-      price: '$9.99',
-      description: 'Complete protection for professionals',
+      name: '🤝 Community',
+      price: '$4.99',
+      period: 'mo',
+      description: '15 recordings/month, 30-day storage, AI summary, folders',
       features: [
-        'Unlimited video recordings',
+        '15 recordings per month',
+        '30-day evidence storage',
+        'AI summarization',
+        'Custom folders',
+        'Priority email support'
+      ],
+      buttonText: 'Choose Community',
+      highlight: false
+    },
+    {
+      name: '🛡️ Self-Defender',
+      price: '$9.99',
+      period: 'mo',
+      description: 'Unlimited proofs, 100GB storage, custom PDF branding',
+      features: [
+        'Unlimited recordings',
+        '100GB storage',
         'Advanced AI analysis',
-        'Priority processing',
-        'Permanent evidence storage',
-        'Custom branding on reports',
-        '24/7 priority support',
-        'Legal template library'
+        'Custom PDF branding',
+        '24/7 priority support'
       ],
       buttonText: 'Go Pro',
       highlight: true
+    },
+    {
+      name: '🚨 Emergency Pack',
+      price: '$14.99',
+      period: 'one-time',
+      description: '10 recordings, no subscription, court/emergency use',
+      features: [
+        '10 recordings (no expiration)',
+        'Lifetime evidence storage',
+        'Priority processing',
+        'Premium support',
+        'Court-ready documentation'
+      ],
+      buttonText: 'Get Emergency Pack',
+      highlight: false
+    },
+    {
+      name: '🌍 Mission Partner',
+      price: '$19.99',
+      period: 'mo',
+      description: 'Helps fund free accounts for others + supporter badge',
+      features: [
+        'All Self-Defender features',
+        'Supporter badge',
+        'Fund free accounts for others',
+        'Early access to new features',
+        'Community recognition'
+      ],
+      buttonText: 'Become a Partner',
+      highlight: false
     }
   ];
 
