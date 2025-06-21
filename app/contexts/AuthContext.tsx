@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { getAnonSupabaseClient } from '@/lib/supabase';
+import supabase from '../lib/supabaseClient';
 import { useRouter, usePathname } from 'next/navigation';
 
 type AuthContextType = {
@@ -25,7 +25,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const getSession = async () => {
       try {
-        const { data: { session }, error } = await getAnonSupabaseClient().auth.getSession();
+        const { data: { session }, error } = await supabase.auth.getSession();
         if (error) throw error;
         setSession(session);
       } catch (err) {
@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     getSession();
 
-    const { data: { subscription } } = getAnonSupabaseClient().auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
     });
 

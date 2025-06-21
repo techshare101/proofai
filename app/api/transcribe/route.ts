@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ServerTranscriptionService } from '../../services/serverTranscriptionService';
-import { getSupabaseClient } from '../../lib/supabase';
+import { getSupabaseClient } from '../../lib/supabaseClient';
 
 export async function POST(request: NextRequest) {
   // Debug: Log environment variables

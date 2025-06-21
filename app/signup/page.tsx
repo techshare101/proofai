@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getAnonSupabaseClient } from '@/lib/supabase';
+import supabase from '../lib/supabaseClient';
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -28,7 +28,7 @@ export default function SignUpPage() {
       setError('');
       setSuccess('');
       
-      const { data, error } = await getAnonSupabaseClient().auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {

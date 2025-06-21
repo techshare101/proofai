@@ -1,4 +1,4 @@
-import { getAnonSupabaseClient } from '../lib/supabase';
+import supabase from '../lib/supabaseClient';
 
 export class FrameService {
   public static async extractFrame(videoElement: HTMLVideoElement): Promise<string> {
@@ -26,7 +26,7 @@ export class FrameService {
       const filePath = `frames/${filename}`;
 
       // Use a fresh anon Supabase client for each call
-      const supabase = getAnonSupabaseClient();
+      // Using imported supabase instance
 
       // Upload to Supabase Storage
       const { data, error } = await supabase.storage

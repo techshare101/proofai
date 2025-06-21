@@ -2,7 +2,7 @@
 import { getAddressFromCoordinates } from "@/utils/geocodeAddress";
 import { TranscriptionService, TranscriptionResult } from '../services/transcriptionService';
 import { GPTService } from '../services/gptService';
-import { getAnonSupabaseClient } from './supabase';
+import supabase from './supabaseClient';
 import { ClientPDFService } from '../services/clientPdfService';
 import { formatSummary } from '../utils/formatSummary';
 import { PdfGenerationRequest } from '../types/pdf';
@@ -140,7 +140,7 @@ export async function uploadRecording(audioBlob: Blob, location: string): Promis
 
     // 4. Upload to storage
     console.log('⬆️ Uploading to Supabase storage...');
-    const { data: storageData, error: storageError } = await getAnonSupabaseClient().storage
+    const { data: storageData, error: storageError } = await supabase.storage
       .from('recordings')
       .upload(filename, audioBlob, {
         contentType: 'video/webm',
@@ -161,7 +161,7 @@ export async function uploadRecording(audioBlob: Blob, location: string): Promis
 
     // 5. Get signed URL
     console.log('🔗 Getting signed URL...');
-    const { data: urlData, error: urlError } = await getAnonSupabaseClient().storage
+    const { data: urlData, error: urlError } = await supabase.storage
       .from('recordings')
       .createSignedUrl(filename, 3600); // 1 hour expiry
 
@@ -247,7 +247,7 @@ export async function uploadRecording(audioBlob: Blob, location: string): Promis
 
     // 10. Generate signed URL for the recording video
     console.log('📹 Creating signed URL for video recording...');
-    const { data: signedUrlData, error: signedUrlError } = await getAnonSupabaseClient()
+    const { data: signedUrlData, error: signedUrlError } = await supabase
       .storage
       .from('recordings')
       .createSignedUrl(filename, 60 * 60 * 24 * 7); // Valid for 7 days
@@ -284,7 +284,7 @@ export async function uploadRecording(audioBlob: Blob, location: string): Promis
 
     console.log('🧾 Payload to Supabase:', payload);
 
-    const { data, error: dbError } = await getAnonSupabaseClient().from('recordings').insert(payload);
+    const { data, error: dbError } = await supabase.from('recordings').insert(payload);
 
     if (dbError) {
       console.error('❌ Supabase insert error:', dbError.message);

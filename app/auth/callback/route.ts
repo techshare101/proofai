@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { getAnonSupabaseClient } from '@/lib/supabase';
+import supabase from '../../lib/supabaseClient';
 
 export async function GET(request: Request) {
   try {
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${requestUrl.origin}?error=no_code`);
     }
 
-    const { error } = await getAnonSupabaseClient().auth.exchangeCodeForSession(code);
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (error) {
       console.error('Auth error:', error);

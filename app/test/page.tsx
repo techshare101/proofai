@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { getAnonSupabaseClient } from '../lib/supabase';
+import supabase from '../lib/supabaseClient';
 import LegalSummaryGenerator from '../components/LegalSummaryGenerator';
 import { generatePDF } from '../utils/generatePDF';
 import * as fs from 'fs';
@@ -15,7 +15,7 @@ export default function TestPage() {
     // Test Supabase connection
     const testConnection = async () => {
       try {
-        const supabase = getAnonSupabaseClient();
+        // Using imported supabase instance
         const { data, error } = await supabase.from('recordings').select('count').single();
         if (error) throw error;
         console.log('✅ Supabase connection successful');
