@@ -65,6 +65,8 @@ export default function Recorder() {
   const [showDownload, setShowDownload] = useState(false)
   const chunks = useRef<Blob[]>([])
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  // Camera toggle functionality
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user")
   
   // Recording time tracking
   const [recordingTime, setRecordingTime] = useState(0)
@@ -72,6 +74,11 @@ export default function Recorder() {
   // Remove fixed time limit to allow extended recording
   // Browser memory limits will naturally constrain maximum recording time
 
+  // Toggle between front and back cameras
+  const toggleCamera = () => {
+    setFacingMode((prev) => (prev === "user" ? "environment" : "user"));
+  };
+  
   useEffect(() => {
     let mounted = true;
     let retryCount = 0;
@@ -121,10 +128,10 @@ export default function Recorder() {
     await new Promise(res => setTimeout(res, 500));
     
     try {
-      // Ensure we include audio for Whisper transcription
-      console.log('Attempting to get user media with audio...');
+      // Ensure we include audio for Whisper transcription and use facingMode
+      console.log(`Attempting to get user media with audio and facingMode: ${facingMode}...`);
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
+        video: { facingMode }, // Use facingMode state to control camera direction
         audio: true, // Audio required for Whisper transcription
       });
 
@@ -442,6 +449,19 @@ export default function Recorder() {
             )}
           </div>
         )}
+
+        {/* Camera Toggle Button */}
+        <button
+          onClick={toggleCamera}
+          disabled={recording}
+          className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700 transition flex items-center justify-center gap-2"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M15 12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h1.172a3 3 0 0 0 2.12-.879l.83-.828A1 1 0 0 1 6.827 3h2.344a1 1 0 0 1 .707.293l.828.828A3 3 0 0 0 12.828 5H14a1 1 0 0 1 1 1v6zM2 4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-1.172a2 2 0 0 1-1.414-.586l-.828-.828A2 2 0 0 0 9.172 2H6.828a2 2 0 0 0-1.414.586l-.828.828A2 2 0 0 1 3.172 4H2z"/>
+            <path d="M8 11a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5zm0 1a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM3 6.5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0z"/>
+          </svg>
+          {facingMode === "user" ? "Switch to Back Camera" : "Switch to Front Camera"}
+        </button>
 
         <div className="flex justify-center space-x-4">
           <button
