@@ -3,44 +3,48 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '../contexts/AuthContext'
-import supabase from '../lib/supabaseClient'
+import supabase from '../lib/supabase'
 import Link from 'next/link'
 import ReportCard, { Report } from '../components/dashboard/ReportCard'
+import { DndContext, DragEndEvent, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import EmptyState from '../components/dashboard/EmptyState'
-import { createPortal } from 'react-dom'
+import LoadingSkeleton from '../components/dashboard/LoadingSkeleton'
 import PDFViewerModal from '../components/dashboard/PDFViewerModal'
+import { insertDummyReport } from '../utils/insertDummyReport'
+import ReportList from '../components/ReportList'
+import { fetchReportsByFolder } from '../../supabase/fetchReportsByFolder'
+import { Switch } from '@headlessui/react'
+import { FaTable, FaThLarge } from 'react-icons/fa'
+import { HiOutlineDocument } from 'react-icons/hi'
+import FolderGroupedReports from '../components/dashboard/FolderGroupedReports'
 
 export default function DashboardPage() {
   const { session } = useAuth()
   const [reports, setReports] = useState<Report[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeFolder, setActiveFolder] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedReport, setSelectedReport] = useState<Report | null>(null)
-  const [showPdfModal, setShowPdfModal] = useState(false)
   const [isBrowser, setIsBrowser] = useState(false)
-  const [showNewFolderModal, setShowNewFolderModal] = useState(false)
-  const [newFolderName, setNewFolderName] = useState('')
-  const [isFolderCreating, setIsFolderCreating] = useState(false)
-  const [folderError, setFolderError] = useState<string | null>(null)
+  const [cardView, setCardView] = useState(true)
+  const [dateFilter, setDateFilter] = useState('all')
+  const [activeFolder, setActiveFolder] = useState<string | null>(null)
+  const [dragFeedback, setDragFeedback] = useState<{message: string, type: 'success' | 'error'} | null>(null)
+  
+  // Set up DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Minimum drag distance to activate (prevents accidental drags)
+      },
+    })
+  )
 
-  // Fetch reports when session or activeFolder changes
+  // Fetch reports when session changes
   useEffect(() => {
-    if (session?.user) {
+    if (session?.user && !activeFolder) {
       fetchReports()
     }
   }, [session, activeFolder])
-  
-  // Listen for folder changes from sidebar
-  useEffect(() => {
-    const handleFolderChange = (e: CustomEvent) => {
-      setActiveFolder(e.detail.folderId)
-    }
-    
-    window.addEventListener('folderChange', handleFolderChange as EventListener)
-    return () => window.removeEventListener('folderChange', handleFolderChange as EventListener)
-  }, [])
   
   // Set isBrowser to true after component mount for portal support
   useEffect(() => {
@@ -54,22 +58,28 @@ export default function DashboardPage() {
       setLoading(true)
       setError(null)
       
-      let query = supabase
-        .from('reports')
-        .select(`
-          id, title, summary, pdf_url, folder_id, created_at,
-          folders(name)
-        `)
-        .eq('user_id', session.user.id)
+      // Use the existing query if we want to maintain backward compatibility
+      // or switch to our new utility for folder-specific reports
+      let data;
       
-      // Filter by folder if selected
       if (activeFolder) {
-        query = query.eq('folder_id', activeFolder)
+        // Use our new utility function to fetch reports by folder
+        data = await fetchReportsByFolder(activeFolder, session.user.id);
+      } else {
+        // Fetch all reports if no folder is selected
+        const { data: allData, error } = await supabase
+          .from('reports')
+          .select(`
+            id, title, summary, pdf_url, folder_id, created_at,
+            folders(name)
+          `)
+          .eq('user_id', session.user.id)
+          .order('created_at', { ascending: false });
+          
+        if (error) throw error;
+        data = allData;
       }
       
-      const { data, error } = await query.order('created_at', { ascending: false })
-      
-      if (error) throw error
       if (data) {
         // Format the data to include folder name and map folder to folder_id
         const formattedReports: Report[] = data.map(item => {
@@ -103,88 +113,133 @@ export default function DashboardPage() {
     setReports(reports.filter(report => report.id !== reportId))
   }
   
-  const handleViewReport = (report: Report) => {
-    setSelectedReport(report)
-    setShowPdfModal(true)
-  }
-  
-  // Handle new folder creation
-  const createNewFolder = async () => {
-    if (!session?.user?.id) return
-    if (!newFolderName.trim()) {
-      setFolderError('Please enter a folder name')
-      return
-    }
+  // Handle report dropped in folder
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
     
-    try {
-      setIsFolderCreating(true)
-      setFolderError(null)
+    // Safety checks
+    if (!active || !over) return;
+    
+    // Extract IDs and types from the drag/drop event
+    const isReportDrag = active.id.toString().startsWith('report-');
+    const isFolderDrop = over.id.toString().startsWith('folder-');
+    
+    if (isReportDrag && isFolderDrop) {
+      const reportId = active.id.toString().replace('report-', '');
+      const folderId = over.id.toString().replace('folder-', '');
       
-      // Get the current authenticated user to ensure we have the latest session
-      const { data: { user } } = await supabase.auth.getUser()
+      // Get the report data
+      const reportData = reports.find(r => r.id === reportId);
+      if (!reportData) return;
       
-      if (!user) {
-        throw new Error('User is not authenticated')
-      }
+      // Show feedback
+      setDragFeedback({
+        message: `Moving "${reportData.title}" to folder...`,
+        type: 'success'
+      });
       
-      // Create folder with explicit user_id from current auth session
-      // This ensures compliance with the RLS policy: auth.uid() = user_id
-      const { data, error } = await supabase
-        .from('folders')
-        .insert([
-          {
-            name: newFolderName.trim(),
-            user_id: user.id // Make sure this matches auth.uid() for RLS
+      try {
+        // Update the report in Supabase
+        const { error } = await supabase
+          .from('reports')
+          .update({ folder_id: folderId })
+          .eq('id', reportId);
+          
+        if (error) throw error;
+        
+        // Update local state
+        setReports(reports.map(report => {
+          if (report.id === reportId) {
+            return { ...report, folder_id: folderId };
           }
-        ])
-        .select()
+          return report;
+        }));
+        
+        setDragFeedback({
+          message: 'Report moved successfully!',
+          type: 'success'
+        });
+        
+        // Clear feedback after 3 seconds
+        setTimeout(() => setDragFeedback(null), 3000);
+        
+      } catch (err) {
+        console.error('Error moving report:', err);
+        setDragFeedback({
+          message: 'Failed to move report',
+          type: 'error'
+        });
+        setTimeout(() => setDragFeedback(null), 3000);
+      }
+    }
+  };
+  
+  /**
+   * Filters reports based on search query, folder, and date criteria
+   * @param reportsToFilter - Array of reports to be filtered
+   * @param filters - Object containing filter criteria
+   * @returns Filtered array of reports
+   */
+  const filterReports = (reportsToFilter: Report[], filters: {
+    query: string;
+    dateRange: string;
+  }) => {
+    const { query, dateRange } = filters;
+    
+    return reportsToFilter.filter(report => {
+      // Search filter - match title or summary
+      const matchesSearch = !query || 
+        report.title.toLowerCase().includes(query.toLowerCase()) || 
+        (report.summary?.toLowerCase() || '').includes(query.toLowerCase());
       
-      if (error) throw error
-      
-      // Close modal and reset state
-      setShowNewFolderModal(false)
-      setNewFolderName('')
-      
-      // Optionally switch to the new folder
-      if (data && data[0]) {
-        setActiveFolder(data[0].id)
+      // Date filter
+      let matchesDate = true;
+      if (dateRange === 'recent') {
+        // Last 7 days
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        matchesDate = new Date(report.created_at) >= sevenDaysAgo;
+      } else if (dateRange === 'month') {
+        // Last 30 days
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        matchesDate = new Date(report.created_at) >= thirtyDaysAgo;
       }
       
-      // Here you would typically refresh the folder list in the sidebar
-      // This could be done via a custom event or context state
-      const folderChangeEvent = new CustomEvent('folderListChange')
-      window.dispatchEvent(folderChangeEvent)
-      
-    } catch (err: any) {
-      console.error('Error creating folder:', err)
-      setFolderError('Failed to create folder')
-    } finally {
-      setIsFolderCreating(false)
-    }
-  }
+      return matchesSearch && matchesDate;
+    });
+  };
   
-  // Filter reports based on search
-  const filteredReports = reports.filter(report => {
-    return report.title.toLowerCase().includes(searchQuery.toLowerCase())
+  // Apply filters to get filtered reports
+  const filteredReports = filterReports(reports, {
+    query: searchQuery,
+    dateRange: dateFilter
   })
   
   return (
-    <div className="h-full">
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="h-full">
+        {/* Main Content */}
+        <div className="flex-1">
       {/* Header section */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">Your Reports</h1>
+        <h1 className="text-2xl font-bold">Your Reports</h1>
         <p className="text-gray-600">Manage and view your PDF reports</p>
       </div>
       
-      {/* Search and Filters */}
-      <div className="mb-6 flex flex-col md:flex-row md:items-center space-y-3 md:space-y-0">
-        <div className="relative flex-grow">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div className="relative w-full sm:max-w-xs">
           <input
             type="text"
             placeholder="Search reports..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-4 py-2 pl-10 pr-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-3 pl-10 pr-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
+            aria-label="Search reports by title or summary"
           />
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -193,43 +248,32 @@ export default function DashboardPage() {
           </div>
         </div>
         
-        <div className="flex items-center space-x-3 md:ml-4">
-          <div className="relative">
-            <select
-              value={activeFolder || ''}
-              onChange={(e) => setActiveFolder(e.target.value !== 'all' ? e.target.value : null)}
-              className="appearance-none bg-white border border-gray-300 rounded-md py-2 pl-3 pr-10 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Folders</option>
-              {/* This would normally be populated from a folders state */}
-              <option value="default">My Reports</option>
-              <option value="shared">Shared</option>
-              <option value="archived">Archived</option>
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-              <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-              </svg>
-            </div>
-          </div>
-          
-          <button 
-            onClick={() => setShowNewFolderModal(true)}
-            className="px-3 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            New Folder
-          </button>
-          
-          <Link href="/recorder" className="inline-block">
-            <button className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+        <div className="flex w-full sm:w-auto">
+          <Link href="/recorder" className="w-full sm:w-auto inline-block">
+            <button className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-5 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 min-h-[44px]">
               New Recording
             </button>
           </Link>
         </div>
       </div>
+      
+      {/* Filter Bar */}
+      {!activeFolder && (
+        <div className="mb-6 mt-4 flex flex-col sm:flex-row flex-wrap gap-3">
+          {/* We're using the search input from the section above, no need to duplicate */}
+
+          <select 
+            className="px-4 py-3 border rounded-md text-sm bg-white shadow-sm focus:ring-blue-500 focus:border-blue-500 min-h-[44px]"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            aria-label="Filter by date range"
+          >
+            <option value="recent">Last 7 Days</option>
+            <option value="month">Last 30 Days</option>
+            <option value="all">All Time</option>
+          </select>
+        </div>
+      )}
       
       {/* Content area */}
       {loading ? (
@@ -240,104 +284,143 @@ export default function DashboardPage() {
         <div className="bg-red-50 p-4 rounded-md">
           <p className="text-red-600">{error}</p>
         </div>
-      ) : filteredReports.length === 0 ? (
-        <EmptyState 
-          title="No reports found" 
-          message={searchQuery ? "No reports match your search" : "You don't have any reports yet"}
-        />
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredReports.map(report => (
-            <ReportCard
-              key={report.id}
-              report={report}
-              onView={handleViewReport}
-              onDelete={handleDeleteReport}
+      ) : !activeFolder ? (
+        <>
+          <div className="flex items-center justify-end mb-4">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-600">View:</span>
+              <Switch
+                checked={cardView}
+                onChange={setCardView}
+                className={`${cardView ? "bg-blue-600" : "bg-gray-300"} relative inline-flex h-6 w-11 items-center rounded-full transition`}
+              >
+                <span
+                  className={`${
+                    cardView ? "translate-x-6" : "translate-x-1"
+                  } inline-block h-4 w-4 transform bg-white rounded-full transition`}
+                />
+              </Switch>
+              {cardView ? <FaThLarge className="text-blue-600" /> : <FaTable className="text-blue-600" />}
+            </div>
+          </div>
+          
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <LoadingSkeleton count={3} />
+            </div>
+          ) : filteredReports.length === 0 ? (
+            <EmptyState 
+              title="No reports found" 
+              message={searchQuery ? "No reports match your search" : "You haven't added any reports yet. Ready to create your first proof?"}
+              showUploadOption={true}
+              folderName={null}
             />
-          ))}
+          ) : cardView ? (
+            activeFolder ? (
+              // Regular card grid for folder view
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredReports.map(report => (
+                  <ReportCard
+                    key={report.id}
+                    report={report}
+                    onView={(report) => window.open(report.pdf_url, '_blank')}
+                    onDelete={handleDeleteReport}
+                  />
+                ))}
+              </div>
+            ) : (
+              // Group by folder when viewing All Folders
+              <FolderGroupedReports 
+                reports={filteredReports}
+                onViewReport={(report) => window.open(report.pdf_url, '_blank')}
+                onDeleteReport={handleDeleteReport}
+              />
+            )
+          ) : (
+            <div className="overflow-x-auto mt-4">
+              <table className="min-w-full bg-white border rounded-lg overflow-hidden">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-600">
+                      Title
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-600">
+                      Summary
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-600">
+                      Folder
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-600">
+                      Date
+                    </th>
+                    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-600">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredReports.map(report => (
+                    <tr
+                      key={report.id}
+                      className="border-t hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="px-4 py-3 font-medium text-blue-600">{report.title}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {report.summary?.substring(0, 100)}{report.summary?.length > 100 ? '...' : ''}
+                      </td>
+                      <td className="px-4 py-3 text-sm">{report.folder_name}</td>
+                      <td className="px-4 py-3 text-sm">
+                        {new Date(report.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => window.open(report.pdf_url, '_blank')}
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            View
+                          </button>
+                          <button
+                            onClick={() => handleDeleteReport(report.id)}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="p-5">
+          <h2 className="text-xl font-semibold mb-4">Reports</h2>
+          <ReportList folderId={activeFolder} />
+        </div>
+      )}
+        </div>
+      </div>
+      
+      {/* Drag feedback notification */}
+      {dragFeedback && (
+        <div className={`fixed bottom-4 right-4 p-4 rounded-md shadow-lg ${dragFeedback.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+          <div className="flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${dragFeedback.type === 'success' ? 'text-green-500' : 'text-red-500'} mr-2`} viewBox="0 0 20 20" fill="currentColor">
+              {dragFeedback.type === 'success' ? (
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              ) : (
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              )}
+            </svg>
+            {dragFeedback.message}
+          </div>
         </div>
       )}
       
-      {/* PDF Viewer Modal */}
-      {isBrowser && showPdfModal && selectedReport && createPortal(
-        <PDFViewerModal 
-          report={selectedReport} 
-          onClose={() => setShowPdfModal(false)} 
-        />,
-        document.body
-      )}
-      
-      {/* New Folder Modal */}
-      {isBrowser && showNewFolderModal && createPortal(
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h3 className="text-lg font-medium">Create New Folder</h3>
-              <button 
-                onClick={() => {
-                  setShowNewFolderModal(false)
-                  setNewFolderName('')
-                  setFolderError(null)
-                }}
-                className="text-gray-400 hover:text-gray-500"
-                aria-label="Close"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            
-            <div className="p-6">
-              <div className="mb-4">
-                <label htmlFor="folderName" className="block text-sm font-medium text-gray-700 mb-1">
-                  Folder Name
-                </label>
-                <input
-                  id="folderName"
-                  type="text"
-                  value={newFolderName}
-                  onChange={(e) => setNewFolderName(e.target.value)}
-                  placeholder="Enter folder name"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={isFolderCreating}
-                />
-                {folderError && <p className="mt-1 text-sm text-red-600">{folderError}</p>}
-              </div>
-              
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={() => {
-                    setShowNewFolderModal(false)
-                    setNewFolderName('')
-                    setFolderError(null)
-                  }}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={isFolderCreating}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={createNewFolder}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                  disabled={isFolderCreating}
-                >
-                  {isFolderCreating ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Creating...
-                    </>
-                  ) : 'Create Folder'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-    </div>
+
+    </DndContext>
   )
 }

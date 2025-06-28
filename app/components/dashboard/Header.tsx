@@ -1,7 +1,7 @@
 'use client'
 
 import { User } from '@supabase/supabase-js'
-import supabase from '../../lib/supabaseClient'
+import supabase from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 

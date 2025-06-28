@@ -1,4 +1,4 @@
-import supabase from '../lib/supabaseClient';
+import supabase from '../lib/supabase';
 
 export class FrameService {
   public static async extractFrame(videoElement: HTMLVideoElement): Promise<string> {

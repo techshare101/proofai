@@ -1,107 +1,100 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { ServerTranscriptionService } from '../../services/serverTranscriptionService';
-import { getSupabaseClient } from '../../lib/supabaseClient';
+import { NextResponse } from "next/server";
 
-export async function POST(request: NextRequest) {
-  // Debug: Log environment variables
-  console.log('API Environment check:', {
-    hasOpenAIKey: !!process.env.OPENAI_API_KEY,
-    keyPrefix: process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.substring(0, 7) : 'missing',
-    allEnvKeys: Object.keys(process.env).filter(key => !key.includes('PASSWORD') && !key.includes('TOKEN')),
-    nodeEnv: process.env.NODE_ENV
-  });
+export async function POST(req: Request) {
+  // Parse FormData instead of JSON
+  const formData = await req.formData();
+  const fileUrl = formData.get('fileUrl') as string;
+  const language = formData.get('language') as string || "auto";
+
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) return NextResponse.json({ error: "Missing API key" }, { status: 500 });
+
   try {
-    // Get either the audio file or URL from the request
-    const formData = await request.formData();
+    // Step 1: Download file from Supabase signed URL
+    console.log("📥 Downloading file from signed URL:", fileUrl?.substring(0, 50) + "...");
     
-    // Check if we're receiving a file URL instead of a file
-    const fileUrl = formData.get('fileUrl') as string;
-    const language = formData.get('language') as string;
-    const translateToEnglish = formData.get('translateToEnglish') === 'true';
+    if (!fileUrl) {
+      console.error("Missing file URL in the request");
+      return NextResponse.json({ error: "Missing file URL" }, { status: 400 });
+    }
     
-    let audioBlob: Blob;
-    
-    if (fileUrl) {
-      // If we have a URL, fetch the file
-      console.log('🔄 Fetching audio from URL:', fileUrl.substring(0, 50) + '...');
-      const response = await fetch(fileUrl);
+    // Download file from signed URL
+    let fileRes;
+    try {
+      fileRes = await fetch(fileUrl);
       
-      if (!response.ok) {
-        return NextResponse.json(
-          { error: `Failed to fetch audio from URL: ${response.status} ${response.statusText}` },
-          { status: 502 }
-        );
+      console.log(`📥 Download response status: ${fileRes.status} ${fileRes.statusText}`);
+      
+      if (!fileRes.ok) {
+        console.error(`Failed to download audio: ${fileRes.status} ${fileRes.statusText}`);
+        return NextResponse.json({ error: `Download failed: ${fileRes.statusText}` }, { status: 500 });
       }
       
-      // Convert to blob
-      const buffer = await response.arrayBuffer();
-      audioBlob = new Blob([buffer], { type: response.headers.get('content-type') || 'audio/webm' });
-      
-      console.log('✅ Successfully fetched audio file:', {
-        size: `${(audioBlob.size / 1024 / 1024).toFixed(2)} MB`,
-        type: audioBlob.type
+      // Check Content-Type header
+      const contentType = fileRes.headers.get('content-type');
+      console.log(`📥 File content type: ${contentType}`);
+    } catch (downloadError) {
+      console.error("📥 Error during file download:", downloadError);
+      return NextResponse.json({ error: `Download error: ${downloadError.message}` }, { status: 500 });
+    }
+    
+    const blob = await fileRes.blob();
+    const file = new File([blob], "recording.webm", { type: "video/webm" });
+    console.log(`✅ File downloaded: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
+
+    // Step 2: Prepare OpenAI request
+    const form = new FormData();
+    form.append("file", file);
+    form.append("model", "whisper-1");
+    form.append("language", language);
+
+    // Step 3: Send to OpenAI
+    console.log("🔄 Calling OpenAI Whisper API...");
+    console.log("🔄 Request to OpenAI with file size:", file.size);
+    
+    // Call OpenAI API
+    let openaiRes;
+    try {
+      openaiRes = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: form,
       });
-    } else {
-      // Get the audio file from the request
-      const audioFile = formData.get('file') as File;
       
-      if (!audioFile) {
-        return NextResponse.json(
-          { error: 'No audio file or URL provided' },
-          { status: 400 }
-        );
-      }
-      
-      // Convert File to Blob for OpenAI API
-      const audioBuffer = await audioFile.arrayBuffer();
-      audioBlob = new Blob([audioBuffer], { type: audioFile.type });
+      console.log(`🔄 OpenAI response status: ${openaiRes.status} ${openaiRes.statusText}`);
+    } catch (openaiError) {
+      console.error("❌ Error calling OpenAI API:", openaiError);
+      return NextResponse.json({ error: `OpenAI API error: ${openaiError.message}` }, { status: 500 });
     }
 
-    // audioBlob is now prepared from either file upload or URL fetch
-
-    // Initialize server-side transcription service
-    const transcriptionService = ServerTranscriptionService.getInstance();
-    
-    // Transcribe the audio
-    const result = await transcriptionService.transcribe(
-      audioBlob as any, // OpenAI API accepts Blob
-      language || '',
-      translateToEnglish
-    );
-
-    // Store transcript data in Supabase if we're in a production environment
-    if (process.env.NODE_ENV === 'production' && process.env.SUPABASE_SERVICE_KEY) {
-      try {
-        const transcriptData = {
-          text: result.text,
-          languageCode: result.languageCode,
-          languageLabel: result.languageLabel,
-          correctedFrom: result.correctedFrom,
-          createdAt: new Date().toISOString()
-        };
-        
-        // Save to Supabase
-        const supabase = getSupabaseClient();
-        const { error } = await supabase
-          .from('transcriptions')
-          .insert(transcriptData);
-        
-        if (error) {
-          console.error('❌ Error saving transcript to Supabase:', error);
-        } else {
-          console.log('✅ Transcript saved to Supabase');
-        }
-      } catch (dbError) {
-        console.error('❌ Database error:', dbError);
-      }
+    const result = await openaiRes.json();
+    if (!openaiRes.ok) {
+      console.error("❌ OpenAI Whisper Error:", result);
+      return NextResponse.json(result, { status: 500 });
     }
 
+    console.log("✅ Transcription successful");
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error('Transcription API error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Transcription failed' },
-      { status: 500 }
-    );
+  } catch (err) {
+    console.error("❌ API error:", err);
+    // Include more detailed error information
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    const errorName = err instanceof Error ? err.name : 'Unknown';
+    const errorStack = err instanceof Error ? err.stack : 'No stack trace';
+    
+    console.error({
+      name: errorName,
+      message: errorMessage,
+      stack: errorStack
+    });
+    
+    return NextResponse.json({ 
+      error: "Server error during transcription", 
+      details: errorMessage,
+      errorType: errorName
+    }, { status: 500 });
   }
 }

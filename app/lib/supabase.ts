@@ -1,28 +1,12 @@
-import { createClient } from "@supabase/supabase-js";
+import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@supabase/supabase-js';
 
-// Client-side singleton instance
-let clientInstance: ReturnType<typeof createClient> | null = null;
+// Create a single Supabase client for the entire application
+// with proper authentication options
+const supabase = createPagesBrowserClient();
 
-// ✅ Safe for client-side usage (uses public anon key)
-export function getAnonSupabaseClient() {
-  if (typeof window !== 'undefined' && clientInstance) {
-    return clientInstance;
-  }
-  
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or ANON_KEY");
-  }
-
-  if (typeof window !== 'undefined') {
-    clientInstance = createClient(url, key);
-    return clientInstance;
-  }
-  
-  return createClient(url, key);
-}
+// Export a consistent instance to avoid multiple GoTrueClient warnings
+export default supabase;
 
 // ✅ Server-only usage (e.g., in API routes or server components)
 export function getSupabaseClient() {
@@ -36,5 +20,5 @@ export function getSupabaseClient() {
   return createClient(url, key);
 }
 
-
-
+// For API routes that use getServerSupabase
+export const getServerSupabase = getSupabaseClient;

@@ -30,25 +30,39 @@ export class ServerTranscriptionService {
   }
 
   public async transcribe(
-    file: Blob,
+    input: Blob | string,
     language = '',
     translateToEnglish = false
   ): Promise<TranscriptionResult> {
     try {
+      // Handle both Blob and URL string inputs
+      const isUrl = typeof input === 'string';
+      
       console.log('🎤 Starting server-side transcription...', {
-        fileSize: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
-        fileType: file.type,
+        inputType: isUrl ? 'URL' : 'Blob',
+        fileSize: !isUrl ? `${((input as Blob).size / 1024 / 1024).toFixed(2)} MB` : 'N/A',
+        fileType: !isUrl ? (input as Blob).type : 'URL',
         language: language || 'auto',
       });
 
-      // Convert Blob to File for OpenAI API
-      const audioFile = new File([file], 'audio.webm', { type: file.type });
-
-      const response = await this.openai.audio[translateToEnglish ? 'translations' : 'transcriptions'].create({
-        file: audioFile,
+      // Set up request parameters
+      const requestParams: any = {
         model: 'whisper-1',
         language: language || undefined,
-      });
+      };
+      
+      // If input is a URL, use it directly
+      if (isUrl) {
+        // For URLs, we need to download the file first
+        console.log('🔗 Processing audio from URL:', (input as string).substring(0, 100) + '...');
+        requestParams.file_url = input as string;
+      } else {
+        // Convert Blob to File for OpenAI API
+        const audioFile = new File([input as Blob], 'audio.webm', { type: (input as Blob).type });
+        requestParams.file = audioFile;
+      }
+
+      const response = await this.openai.audio[translateToEnglish ? 'translations' : 'transcriptions'].create(requestParams);
 
       console.log('✅ Transcription complete');
 

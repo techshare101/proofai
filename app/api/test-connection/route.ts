@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSupabase } from '@/lib/supabaseClient';
+import { getServerSupabase } from '@/lib/supabase';
 
 export async function GET() {
   try {
@@ -7,7 +7,7 @@ export async function GET() {
     
     // Test the connection
     const { count, error } = await supabase
-      .from('recordings')
+      .from('reports')
       .select('*', { count: 'exact', head: true });
 
     if (error) throw error;

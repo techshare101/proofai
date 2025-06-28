@@ -1,7 +1,8 @@
 'use client'
-
-import { useEffect, useState } from 'react'
-import supabase from '../../lib/supabaseClient'
+import { useState, useEffect, useMemo } from 'react'
+import supabase from '@/lib/supabase'
+import { deleteFolder } from '../../../supabase/deleteFolder'
+import DroppableFolder from './DroppableFolder'
 
 interface Folder {
   id: string
@@ -10,9 +11,11 @@ interface Folder {
 
 interface FolderSidebarProps {
   userId: string | undefined
+  onReportDrop?: (reportId: string, folderId: string) => Promise<void>
+  className?: string
 }
 
-export default function FolderSidebar({ userId }: FolderSidebarProps) {
+export default function FolderSidebar({ userId, onReportDrop, className = '' }: FolderSidebarProps) {
   const [folders, setFolders] = useState<Folder[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -87,7 +90,7 @@ export default function FolderSidebar({ userId }: FolderSidebarProps) {
   }
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 p-4 overflow-y-auto">
+    <aside className={`w-64 bg-white border-r border-gray-200 p-4 overflow-y-auto ${className}`}>
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-gray-800">Folders</h2>
       </div>
@@ -102,17 +105,46 @@ export default function FolderSidebar({ userId }: FolderSidebarProps) {
           <div className="text-sm text-gray-500">No folders found</div>
         ) : (
           folders.map((folder) => (
-            <button
-              key={folder.id}
-              onClick={() => handleFolderClick(folder.id)}
-              className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium 
-                ${activeFolder === folder.id 
-                  ? 'bg-blue-50 text-blue-600' 
-                  : 'text-gray-700 hover:bg-gray-100'
-                }`}
-            >
-              {folder.name}
-            </button>
+            <div key={folder.id} className="flex justify-between items-center">
+              <DroppableFolder 
+                id={folder.id} 
+                isActive={activeFolder === folder.id}
+                onFolderClick={handleFolderClick}
+                name={folder.name}
+                userId={userId}
+                onFolderDeleted={fetchFolders}
+              >
+                <div className="flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                  </svg>
+                  {folder.name}
+                </div>
+              </DroppableFolder>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (confirm('Delete this folder?')) {
+                    deleteFolder(folder.id, userId).then(() => {
+                      // Re-fetch the folders list
+                      fetchFolders();
+                      // If the active folder was deleted, reset to null
+                      if (activeFolder === folder.id) {
+                        setActiveFolder(null);
+                        // Dispatch event with null folderId
+                        window.dispatchEvent(new CustomEvent('folderChange', { detail: { folderId: null } }));
+                      }
+                    }).catch(err => {
+                      console.error('Error deleting folder:', err);
+                      setError('Failed to delete folder');
+                    });
+                  }
+                }}
+                className="text-red-500 text-sm ml-4 p-1 hover:bg-red-50 rounded"
+              >
+                Delete
+              </button>
+            </div>
           ))
         )}
       </nav>

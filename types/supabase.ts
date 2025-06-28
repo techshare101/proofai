@@ -9,64 +9,68 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
-      recordings: {
+      folders: {
         Row: {
           id: string
           created_at: string
-          title: string
-          duration: number
-          storage_path: string
-          transcript: string | null
+          name: string
+          user_id: string
+          is_default: boolean
         }
         Insert: {
           id?: string
           created_at?: string
-          title: string
-          duration: number
-          storage_path: string
-          transcript?: string | null
-        }
-      }
-      summaries: {
-        Row: {
-          id: string
-          recording_id: string
-          created_at: string
-          content: string
-          keywords: string[]
-        }
-        Insert: {
-          id?: string
-          recording_id: string
-          created_at?: string
-          content: string
-          keywords: string[]
+          name: string
+          user_id: string
+          is_default?: boolean
         }
       }
       reports: {
         Row: {
           id: string
-          recording_id: string
-          summary_id: string
           created_at: string
-          pdf_url: string
-          metadata: {
-            title: string
-            generated_at: string
-            page_count: number
-          }
+          title: string
+          summary: string | null
+          transcript: string | null
+          report_url: string | null
+          folder_id: string
+          user_id: string
+          status: string
+          duration?: number
+          location?: string
         }
         Insert: {
           id?: string
-          recording_id: string
-          summary_id: string
           created_at?: string
-          pdf_url: string
-          metadata: {
-            title: string
-            generated_at: string
-            page_count: number
-          }
+          title: string
+          summary?: string | null
+          transcript?: string | null
+          report_url?: string | null
+          folder_id: string
+          user_id: string
+          status?: string
+          duration?: number
+          location?: string
+        }
+      }
+      transcriptions: {
+        Row: {
+          id: string
+          created_at: string
+          text: string
+          languageCode: string
+          languageLabel: string
+          correctedFrom?: string | null
+          chunkCount?: number
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          text: string
+          languageCode: string
+          languageLabel: string
+          correctedFrom?: string | null
+          chunkCount?: number
         }
       }
     }

@@ -25,6 +25,7 @@ interface PolishedPDFInput {
   reportPublicUrl?: string; // Public URL for report verification QR code
   includeSignature?: boolean; // Whether to include the signature placeholder
   transcript?: string; // Added to fix compatibility issues
+  language?: string; // Language of the transcript
 }
 
 /**
@@ -45,13 +46,18 @@ export async function generatePolishedPDF(options: PolishedPDFInput): Promise<Bl
   // Add font that has better Unicode support
   doc.setFont('courier');
   
-  // Set document properties
-  doc.setProperties({
+  // Set up document metadata for accessibility
+  doc.setDocumentProperties({
+    creator: 'ProofAI',
     title: `Case Report: ${options.caseId}`,
-    subject: 'Case Transcript and Summary',
-    author: 'ProofAI System',
-    creator: 'ProofAI PDF Generator',
+    subject: 'Transcript and Report Summary',
+    keywords: 'ProofAI, Evidence, Legal',
+    author: 'ProofAI System'
   });
+  
+  // Configure page margins and size
+  const pageMargins = [40, 60, 40, 60]; // left, top, right, bottom
+  // Page size is already set to A4 in jsPDF initialization
   
   // Document constants
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -311,10 +317,12 @@ export async function generatePolishedPDF(options: PolishedPDFInput): Promise<Bl
   doc.setFontSize(14);
   
   // If we have both transcripts, label the first one as ENGLISH TRANSCRIPT
+  // Include language if available
+  const language = options.language || 'Unknown';
   if (hasSpanishTranscript && hasEnglishTranscript) {
-    doc.text('ENGLISH TRANSCRIPT', margin, yPos);
+    doc.text(`ENGLISH TRANSCRIPT (${language})`, margin, yPos);
   } else {
-    doc.text('TRANSCRIPT', margin, yPos);
+    doc.text(`TRANSCRIPT (${language})`, margin, yPos);
   }
   
   // Slightly reduced spacing after header
@@ -328,6 +336,29 @@ export async function generatePolishedPDF(options: PolishedPDFInput): Promise<Bl
   // If options.transcript is not available, try to use options.content
   const transcriptContent = options.transcript || options.content || '';
   
+  // CRITICAL: Log any naming issues in transcript fields
+  console.log('📋 Transcript field name check:', {
+    hasTranscriptField: 'transcript' in options,
+    hasContentField: 'content' in options,
+    hasOriginalTranscriptField: 'original_transcript' in options,
+    fieldNames: Object.keys(options).filter(key => key.includes('transcript') || key.includes('content'))
+  });
+  
+  // CRITICAL: Log full data to ensure transcript content is available
+  console.log(`🔍 PDF Generation Data Check:`, {
+    hasTranscript: !!options.transcript,
+    hasContent: !!options.content,
+    transcriptLength: transcriptContent.length,
+    originalTranscriptLength: (options.original_transcript || '').length,
+    language: options.language || 'Unknown'
+  });
+  
+  // Debug output to verify transcript length
+  console.log(`🗣️ Transcript length: ${transcriptContent.length} characters`);
+  if (transcriptContent.length > 5000) {
+    console.log(`🗣️ Large transcript detected (${transcriptContent.length} chars). First 100 chars: ${transcriptContent.substring(0, 100)}...`);
+  }
+  
   if (transcriptContent && transcriptContent.trim() !== '') {
     // Apply text sanitization to transcript content
     const transcriptText = sanitizeText(transcriptContent);
@@ -335,24 +366,50 @@ export async function generatePolishedPDF(options: PolishedPDFInput): Promise<Bl
     // Split text to fit the available width
     const transcriptLines = doc.splitTextToSize(transcriptText, contentWidth);
     
-    // Handle pagination for potentially long transcript
+    // ENHANCED pagination for potentially long transcript
+    console.log(`📄 Transcript has ${transcriptLines.length} lines to render`);
+    
     if (transcriptLines.length > 0) {
+      // Force a reasonable max height per page to ensure pagination
+      const maxLinesPerPage = Math.floor((pageHeight - (margin * 2)) / lineHeight) - 5; // Subtract 5 for header/footer space
+      console.log(`📄 Maximum lines per page: ${maxLinesPerPage}`);
+      
+      let linesOnCurrentPage = 0;
+      
       for (let i = 0; i < transcriptLines.length; i++) {
-        if (yPos > pageHeight - margin) {
+        // Force a new page if we've hit the maximum lines per page
+        if (linesOnCurrentPage >= maxLinesPerPage || yPos > pageHeight - margin - lineHeight) {
+          console.log(`📄 Adding new page after ${linesOnCurrentPage} lines`);
           doc.addPage();
           yPos = margin;
+          linesOnCurrentPage = 0;
+          
           // Add "continued" indicator on new pages
           doc.setFont('helvetica', 'italic');
           doc.text('(continued)', margin, yPos);
-          yPos += lineHeight;
+          yPos += lineHeight * 1.5; // Extra space after continued indicator
+          
           // Important: reset to normal font after indicator
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(12);
         }
-        // Render each line directly with UTF-8 encoding preserved
-        doc.text(transcriptLines[i], margin, yPos);
-        yPos += lineHeight;
+        
+        // Double check text is properly sanitized
+        const safeText = sanitizeText(transcriptLines[i]);
+        
+        try {
+          // Render each line with error handling
+          doc.text(safeText, margin, yPos);
+          yPos += lineHeight;
+          linesOnCurrentPage++;
+        } catch (err) {
+          console.error(`📄 Error rendering text line ${i}:`, err);
+          // Try to continue with next line
+        }
       }
+      
+      // Log completion stats
+      console.log(`📄 Finished rendering ${transcriptLines.length} lines across multiple pages`);
     } else {
       doc.text('No transcript available.', margin, yPos);
       yPos += lineHeight;
@@ -385,27 +442,57 @@ export async function generatePolishedPDF(options: PolishedPDFInput): Promise<Bl
     // Get the original transcript text and sanitize it
     const originalTranscript = sanitizeText(options.original_transcript || '');
     
+    // Debug output for original transcript
+    console.log(`📝 Original transcript length: ${originalTranscript.length} characters`);
+    if (originalTranscript.length > 0) {
+      console.log(`📝 Original transcript excerpt: ${originalTranscript.substring(0, 100)}...`);
+    }
+    
     // Split the text to fit the page width
     const originalLines = doc.splitTextToSize(originalTranscript, contentWidth);
+    console.log(`📄 Original transcript has ${originalLines.length} lines to render`);
     
     if (originalLines.length > 0) {
-      // Iterate through lines and handle pagination
+      // Enhanced pagination for potentially long original transcript
+      const maxLinesPerPage = Math.floor((pageHeight - (margin * 2)) / lineHeight) - 5; // Subtract 5 for header/footer space
+      console.log(`📄 Maximum lines per page for original: ${maxLinesPerPage}`);
+      
+      let linesOnCurrentPage = 0;
+      
       for (let i = 0; i < originalLines.length; i++) {
-        if (yPos > pageHeight - margin) {
+        // Force a new page if we've hit the maximum lines per page or approaching bottom margin
+        if (linesOnCurrentPage >= maxLinesPerPage || yPos > pageHeight - margin - lineHeight) {
+          console.log(`📄 Adding new page after ${linesOnCurrentPage} lines (original transcript)`);
           doc.addPage();
           yPos = margin;
+          linesOnCurrentPage = 0;
+          
           // Add "continuado" indicator on new pages for Spanish
           doc.setFont('helvetica', 'italic');
           doc.text('(continuado)', margin, yPos);
-          yPos += lineHeight;
+          yPos += lineHeight * 1.5; // Extra space after continued indicator
+          
           // Reset to normal font after indicator
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(12);
         }
-        // Render each line
-        doc.text(originalLines[i], margin, yPos);
-        yPos += lineHeight;
+        
+        // Double check text is properly sanitized
+        const safeText = sanitizeText(originalLines[i]);
+        
+        try {
+          // Render each line with error handling
+          doc.text(safeText, margin, yPos);
+          yPos += lineHeight;
+          linesOnCurrentPage++;
+        } catch (err) {
+          console.error(`📄 Error rendering original text line ${i}:`, err);
+          // Try to continue with next line
+        }
       }
+      
+      // Log completion stats
+      console.log(`📄 Finished rendering ${originalLines.length} lines of original transcript`);
     } else {
       doc.setFont('helvetica', 'italic');
       doc.text('No original transcript available.', margin, yPos);

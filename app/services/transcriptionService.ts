@@ -20,7 +20,6 @@ function detectLanguage(text: string): string {
 
 export class TranscriptionService {
   private static instance: TranscriptionService;
-  private apiKey: string;
 
   private constructor() {
     // No initialization needed for client-side service
@@ -69,12 +68,16 @@ export class TranscriptionService {
         inputType: typeof audioInput === 'string' ? 'URL' : 'File',
         fileType: typeof audioInput !== 'string' ? audioInput.type : 'from URL',
         language: language || 'auto',
-        endpoint: 'transcriptions',
-        apiKey: this.apiKey ? 'Set' : 'Missing'
+        endpoint: 'transcriptions'
+        // API key is handled by the server-side endpoint
       });
       // Add optional parameters
-      if (language) {
+      // API requires valid ISO-639-1 language code, default to 'en' if not specified or 'auto'
+      if (language && language !== 'auto') {
         formDataForAPI.append('language', language);
+      } else {
+        // Default to English if no language is specified or 'auto' is used
+        formDataForAPI.append('language', 'en');
       }
       if (translateToEnglish) {
         formDataForAPI.append('translateToEnglish', 'true');
@@ -87,8 +90,8 @@ export class TranscriptionService {
 
       if (!response.ok) {
         const error = await response.json();
-        console.error('❌ Transcription API error:', error);
-        throw new Error(error.error || 'Transcription failed');
+        console.error('❌ Transcription API error detail:', error);
+        throw new Error(`Transcription failed: ${error?.error?.message || JSON.stringify(error)}`);
       }
 
       const responseData = await response.json();
@@ -131,9 +134,8 @@ export class TranscriptionService {
         );
       }
 
-      throw new Error(
-        `Transcription failed: ${errorMessage}. Please try again or contact support if this persists.`
-      );
+      console.error('❌ Transcription error detail:', error);
+      throw new Error(`Transcription failed: ${error?.error?.message || JSON.stringify(error)}`);
     }
   }
 
@@ -154,12 +156,16 @@ export class TranscriptionService {
         formData.append('source_language', sourceLanguage);
       }
 
-      const response = await fetch('https://api.openai.com/v1/audio/translations', {
+      // Use our server-side API endpoint instead of calling OpenAI directly
+      const formDataForAPI = new FormData();
+      formDataForAPI.append('text', text);
+      if (sourceLanguage) {
+        formDataForAPI.append('sourceLanguage', sourceLanguage);
+      }
+      
+      const response = await fetch('/api/translate', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-        },
-        body: formData
+        body: formDataForAPI
       });
 
       if (!response.ok) {

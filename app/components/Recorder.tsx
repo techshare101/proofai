@@ -111,35 +111,41 @@ export default function Recorder() {
 
   const initializeCamera = async () => {
     setStatus('requesting');
-    if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera not supported');
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError('Your browser does not support camera access');
+      setStatus('error');
+      return;
+    }
 
     cleanupStream();
     await new Promise(res => setTimeout(res, 500));
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const videoDevices = devices.filter(d => d.kind === 'videoinput');
-    if (!videoDevices.length) throw new Error('No camera devices found');
-
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        deviceId: videoDevices[0].deviceId,
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      },
-      audio: true
-    });
-
-    streamRef.current = stream;
-    if (videoRef.current) {
-      videoRef.current.srcObject = stream;
-      await new Promise((resolve, reject) => {
-        if (!videoRef.current) return reject('Video element not found');
-        videoRef.current.onloadedmetadata = () => videoRef.current?.play().then(resolve).catch(reject);
-        videoRef.current.onerror = reject;
+    
+    try {
+      // Ensure we include audio for Whisper transcription
+      console.log('Attempting to get user media with audio...');
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true, // Audio required for Whisper transcription
       });
-    }
 
-    setError('');
-    setStatus('ready');
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await new Promise((resolve, reject) => {
+          if (!videoRef.current) return reject('Video element not found');
+          videoRef.current.onloadedmetadata = () => videoRef.current?.play().then(resolve).catch(reject);
+          videoRef.current.onerror = reject;
+        });
+      }
+
+      console.log("Camera initialized with minimal constraints.");
+      setError('');
+      setStatus('ready');
+    } catch (err) {
+      console.error('Camera initialization error:', err);
+      setError(`Could not initialize camera. Please ensure no other app is using it.`);
+      setStatus('error');
+    }
   };
 
   const cleanupStream = () => {
@@ -171,10 +177,20 @@ export default function Recorder() {
   };
 
   const startRecording = async () => {
+    console.log('Start recording button clicked');
     const stream = streamRef.current;
     if (!stream) {
+      console.error('Stream not available for recording');
       setError('Camera not initialized');
       return;
+    }
+    
+    // Check if stream has audio tracks
+    const audioTracks = stream.getAudioTracks();
+    console.log(`Stream has ${audioTracks.length} audio tracks:`, 
+      audioTracks.map(track => `${track.label} (enabled: ${track.enabled})`))
+    if (audioTracks.length === 0) {
+      console.warn('No audio tracks found in stream! Whisper transcription will fail.');
     }
 
     try {
@@ -203,6 +219,7 @@ export default function Recorder() {
       };
 
       recorder.onstop = async () => {
+        console.log('MediaRecorder onstop event triggered');
         // Clear the recording timer when recording stops
         if (recordingTimer.current) {
           clearInterval(recordingTimer.current);
@@ -273,14 +290,31 @@ export default function Recorder() {
   };
 
   const stopRecording = () => {
+    console.log('Stop recording button clicked');
     if (mediaRecorder?.state === 'recording') {
+      console.log('Stopping media recorder...');
       mediaRecorder.stop();
       setRecording(false);
+    } else {
+      console.warn(`MediaRecorder not in recording state. Current state: ${mediaRecorder?.state || 'undefined'}`);
     }
   };
 
   const retryCamera = async () => {
     cleanupStream();
+    // Clear any previous errors
+    setError('');
+    // Provide instructions for users to reset permissions
+    toast((
+      <div>
+        <p>Please make sure camera permissions are enabled:</p>
+        <ol className="list-decimal pl-5 mt-1 text-sm">
+          <li>Check your browser's URL bar for camera icon</li>
+          <li>Click it and select "Allow"</li>
+          <li>Refresh the page if needed</li>
+        </ol>
+      </div>
+    ), { duration: 6000 });
     await initializeCamera();
   };
 

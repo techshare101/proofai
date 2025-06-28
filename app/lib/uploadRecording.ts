@@ -2,7 +2,7 @@
 import { getAddressFromCoordinates } from "@/utils/geocodeAddress";
 import { TranscriptionService, TranscriptionResult } from '../services/transcriptionService';
 import { GPTService } from '../services/gptService';
-import supabase from './supabaseClient';
+import supabase from './supabase';
 import { ClientPDFService } from '../services/clientPdfService';
 import { formatSummary } from '../utils/formatSummary';
 import { PdfGenerationRequest } from '../types/pdf';
@@ -41,7 +41,7 @@ async function generatePdfWithRetry(data: {
       const formattedSummary = formatSummary(data.summary);
       
       // RADICAL FIX: Force videoUrl into formatted summary 
-      if (typeof formattedSummary === 'object') {
+      if (typeof formattedSummary === 'object' && formattedSummary !== null) {
         formattedSummary.videoUrl = videoUrl;
         console.log('✅ Injected video URL directly into formatted summary');
       }
@@ -107,14 +107,18 @@ export async function uploadRecording(audioBlob: Blob, location: string): Promis
       size: `${(audioBlob.size / 1024 / 1024).toFixed(2)} MB`
     });
 
-    // 2. (DEV ONLY) Bypass authentication
-    console.log('🔐 [DEV] Bypassing authentication for upload...');
-    const session = { user: { id: 'dev-user', email: 'dev@example.com' } };
-    console.log('✅ [DEV] Faked authentication as:', session.user.email);
+    // 2. Get authenticated user or use dev fallback
+    console.log('🔐 Getting authenticated user...');
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    
+    // Use user ID as identifier (required by Supabase RLS policies) or fallback to dev-user
+    const userId = userData?.user?.id ?? 'dev-user';
+    const userEmail = userData?.user?.email ?? 'dev-user'; // Keep for logging
+    console.log('✅ Authenticated as:', userEmail, '(ID:', userId, ')');
 
     // 3. Generate filename
-    const userId = session.user.id;
     const timestamp = new Date().toISOString().replace(/[^0-9]/g, '');
+    // Don't add 'reports/' prefix - the bucket name is already 'reports'
     filename = `${userId}/${timestamp}-recording.webm`;
     console.log('📝 Preparing upload:', { filename, location });
 
@@ -139,9 +143,10 @@ export async function uploadRecording(audioBlob: Blob, location: string): Promis
     }
 
     // 4. Upload to storage
-    console.log('⬆️ Uploading to Supabase storage...');
+    const bucketName = 'recordings';
+    console.log('⬆️ Uploading to Supabase storage bucket:', bucketName);
     const { data: storageData, error: storageError } = await supabase.storage
-      .from('recordings')
+      .from(bucketName)
       .upload(filename, audioBlob, {
         contentType: 'video/webm',
         duplex: 'half',
@@ -159,11 +164,17 @@ export async function uploadRecording(audioBlob: Blob, location: string): Promis
     }
     console.log('✅ Upload successful:', storageData.path);
 
+    // Add a small delay to allow for replication across Supabase storage
+    console.log('⌛ Wait 2 seconds for storage replication...');
+    await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+
     // 5. Get signed URL
     console.log('🔗 Getting signed URL...');
+    // FIXED: Use the actual path returned by Supabase instead of local filename
+    console.log('📦 Generating signed URL from bucket:', bucketName, 'for file:', storageData.path);
     const { data: urlData, error: urlError } = await supabase.storage
-      .from('recordings')
-      .createSignedUrl(filename, 3600); // 1 hour expiry
+      .from(bucketName)
+      .createSignedUrl(storageData.path, 3600); // 1 hour expiry
 
     if (urlError || !urlData?.signedUrl) {
       console.error('❌ Failed to get signed URL:', urlError);
@@ -247,10 +258,11 @@ export async function uploadRecording(audioBlob: Blob, location: string): Promis
 
     // 10. Generate signed URL for the recording video
     console.log('📹 Creating signed URL for video recording...');
+    console.log('📦 Generating long-term signed URL from bucket:', bucketName, 'for file:', storageData.path);
     const { data: signedUrlData, error: signedUrlError } = await supabase
       .storage
-      .from('recordings')
-      .createSignedUrl(filename, 60 * 60 * 24 * 7); // Valid for 7 days
+      .from(bucketName)
+      .createSignedUrl(storageData.path, 60 * 60 * 24 * 7); // Valid for 7 days
 
     if (signedUrlError) {
       console.error("❌ Failed to generate signed video URL:", signedUrlError);
@@ -273,18 +285,20 @@ export async function uploadRecording(audioBlob: Blob, location: string): Promis
 
     // 11. Save to Supabase
     const payload = {
+      title: `Proof Report – ${new Date().toLocaleString()}`, // Add default title
       file_url: signedUrl, // matches the DB schema
       summary,
       original_transcript: transcript,
       translated_transcript: translatedTranscript,
       language_detected: languageDetected,
       location,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      user_id: userId // Add user_id for RLS policy
     };
 
     console.log('🧾 Payload to Supabase:', payload);
 
-    const { data, error: dbError } = await supabase.from('recordings').insert(payload);
+    const { data, error: dbError } = await supabase.from('reports').insert(payload).select();
 
     if (dbError) {
       console.error('❌ Supabase insert error:', dbError.message);
@@ -331,7 +345,11 @@ export async function uploadRecording(audioBlob: Blob, location: string): Promis
       throw new Error('Failed to generate PDF. Please try again.');
     } else {
       throw new Error(
-        `Upload failed during ${uploadError.stage || 'process'}: ${uploadError.message}`
+        `Upload failed during ${uploadError.stage || 'process'}: ${
+          typeof uploadError.message === 'string'
+            ? uploadError.message
+            : JSON.stringify(uploadError.message)
+        }`
       );
     }
   }

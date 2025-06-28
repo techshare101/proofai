@@ -1,6 +1,6 @@
 'use client';
 
-import supabase from '../lib/supabaseClient';
+import supabase from '../lib/supabase';
 
 export default function AuthError({ message }: { message: string }) {
   return (

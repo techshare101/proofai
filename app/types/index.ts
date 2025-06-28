@@ -16,7 +16,9 @@ export interface ReportData {
   metadata?: {
     userName?: string;
     caseId?: string;
+    language?: string; // Language of the transcript (e.g., 'English', 'Spanish')  
   };
+  language?: string; // Top-level language field for easier access
 }
 
 export interface SummaryResult {

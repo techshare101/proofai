@@ -43,6 +43,25 @@ export async function POST(req: Request) {
       console.log('[PDF API] Location:', summary.location);
     }
     
+    // Debug log transcript and language data
+    console.log('[PDF API] Transcript data check:', {
+      hasTranscript: !!summary.transcript,
+      transcriptLength: summary.transcript?.length || 0,
+      hasOriginalTranscript: !!summary.originalTranscript,
+      originalTranscriptLength: summary.originalTranscript?.length || 0,
+      language: summary.language || 'Not specified',
+    });
+    
+    // If transcript available, log excerpt
+    if (summary.transcript && summary.transcript.length > 0) {
+      console.log('[PDF API] Transcript excerpt:', summary.transcript.substring(0, 100) + '...');
+    }
+    
+    // If original transcript available, log excerpt
+    if (summary.originalTranscript && summary.originalTranscript.length > 0) {
+      console.log('[PDF API] Original transcript excerpt:', summary.originalTranscript.substring(0, 100) + '...');
+    }
+    
     const pdfBuffer = Buffer.from(
       await generatePDF({
         content: formattedSummary,

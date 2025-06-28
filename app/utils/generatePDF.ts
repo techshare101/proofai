@@ -43,6 +43,18 @@ export async function generatePDF(request: PdfRequest): Promise<Uint8Array> {
     const transcript = structuredSummary?.transcript || '';
     // Keep the original Spanish transcript separate
     const cleanedOriginal = structuredSummary?.originalTranscript || '';
+    // Get language info - use provided language or detect based on transcript
+    const language = structuredSummary?.language || 
+                    (cleanedOriginal && cleanedOriginal.length > 0 ? 'Spanish' : 'English');
+    
+    // Debug the transcript and language data
+    console.log('[generatePDF] Transcript data:', {
+      transcriptLength: transcript.length,
+      originalTranscriptLength: cleanedOriginal.length,
+      language,
+      transcriptExcerpt: transcript.substring(0, 50) + '...',
+      originalExcerpt: cleanedOriginal.substring(0, 50) + '...'
+    });
     
     // Extract location from structured summary content if it contains a line with "📍 Location:" prefix
     let location = 'Unknown Location';
@@ -114,6 +126,7 @@ export async function generatePDF(request: PdfRequest): Promise<Uint8Array> {
       content: transcript || fullContent,
       transcript,
       original_transcript: cleanedOriginal, // Pass the original Spanish transcript
+      language, // Explicitly pass the language parameter for correct labeling
       location,
       videoUrl,
       caseId: caseId || structuredSummary?.caseId || 'Unspecified',
