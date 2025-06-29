@@ -102,6 +102,9 @@ export default function Recorder() {
       }
     };
 
+    // Clean up previous stream before initializing a new one when facingMode changes
+    cleanupStream();
+    
     // Small delay to ensure DOM is ready
     const timer = setTimeout(() => {
       if (mounted) init();
@@ -109,12 +112,11 @@ export default function Recorder() {
 
     return () => {
       mounted = false;
+      if (timer) clearTimeout(timer);
       if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
-      if (recordingTimer.current) clearInterval(recordingTimer.current);
-      clearTimeout(timer);
       cleanupStream();
     };
-  }, []);
+  }, [facingMode]); // Re-initialize camera when facingMode changes
 
   const initializeCamera = async () => {
     setStatus('requesting');
@@ -124,9 +126,6 @@ export default function Recorder() {
       return;
     }
 
-    cleanupStream();
-    await new Promise(res => setTimeout(res, 500));
-    
     try {
       // Ensure we include audio for Whisper transcription and use facingMode
       console.log(`Attempting to get user media with audio and facingMode: ${facingMode}...`);
@@ -157,30 +156,29 @@ export default function Recorder() {
 
   const cleanupStream = () => {
     try {
+      // First clean up the referenced stream if it exists
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => {
-          track.stop();
-          streamRef.current?.removeTrack(track);
+        const tracks = streamRef.current.getTracks();
+        tracks.forEach(track => {
+          if (track.readyState === 'live') {
+            track.stop();
+          }
         });
         streamRef.current = null;
       }
 
-      if (videoRef.current) {
+      // Then clean up the video element's source stream
+      if (videoRef.current && videoRef.current.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
         videoRef.current.srcObject = null;
-        videoRef.current.load();
       }
-
-      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        mediaRecorder.stop();
-      }
-    } catch (err) {
-      console.warn('Error cleaning up stream:', err);
+      
+      // No need to create extra streams just to clean them up
+      // This can cause permission prompts and is inefficient
+    } catch (e) {
+      console.warn('Error during stream cleanup:', e);
     }
-
-    setMediaRecorder(null);
-    setRecording(false);
-    setStatus('idle');
-    setError('');
   };
 
   const startRecording = async () => {
