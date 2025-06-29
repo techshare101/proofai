@@ -21,7 +21,7 @@ interface PolishedPDFInput {
   participants?: string | string[];
   relevance?: string;
   legalRelevance?: string; // Legal relevance information (legacy field)
-  original_transcript?: string; // Spanish original transcript
+  original_transcript?: string; // Original transcript in detected language
   reportPublicUrl?: string; // Public URL for report verification QR code
   includeSignature?: boolean; // Whether to include the signature placeholder
   transcript?: string; // Added to fix compatibility issues
@@ -298,9 +298,9 @@ export async function generatePolishedPDF(options: PolishedPDFInput): Promise<Bl
   // Add section divider with reduced spacing
   addSectionDivider();
   
-  // Check if we have both English and Spanish transcripts
-  const hasSpanishTranscript = options.original_transcript && options.original_transcript.trim() !== '';
-  const hasEnglishTranscript = options.transcript || options.content;
+  // Check if we have both translated and original transcripts
+  const hasOriginalTranscript = options.original_transcript && options.original_transcript.trim() !== '';
+  const hasTranslatedTranscript = options.transcript || options.content;
   
   // Calculate height needed for transcript header and first few lines
   const minTranscriptHeight = lineHeight * 5; // Space for header + first few lines
@@ -316,13 +316,17 @@ export async function generatePolishedPDF(options: PolishedPDFInput): Promise<Bl
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
   
-  // If we have both transcripts, label the first one as ENGLISH TRANSCRIPT
-  // Include language if available
-  const language = options.language || 'Unknown';
-  if (hasSpanishTranscript && hasEnglishTranscript) {
-    doc.text(`ENGLISH TRANSCRIPT (${language})`, margin, yPos);
+  // If we have both transcripts, label appropriately based on languages
+  // Get the detected/selected language from options
+  const detectedLanguage = options.language || 'Unknown';
+  
+  // Use appropriate section headings
+  if (hasOriginalTranscript && hasTranslatedTranscript) {
+    // When we have both, show that this is the English translation
+    doc.text(`ENGLISH TRANSLATION`, margin, yPos);
   } else {
-    doc.text(`TRANSCRIPT (${language})`, margin, yPos);
+    // Otherwise just show detected language
+    doc.text(`TRANSCRIPT (${detectedLanguage})`, margin, yPos);
   }
   
   // Slightly reduced spacing after header
@@ -423,8 +427,8 @@ export async function generatePolishedPDF(options: PolishedPDFInput): Promise<Bl
   // Add section divider after main transcript
   addSectionDivider();
   
-  // Now add the Spanish ORIGINAL TRANSCRIPT section if available
-  if (hasSpanishTranscript) {
+  // Now add the ORIGINAL TRANSCRIPT section if available
+  if (hasOriginalTranscript) {
     // Always start on a new page for original transcript
     doc.addPage();
     yPos = margin;
@@ -432,7 +436,7 @@ export async function generatePolishedPDF(options: PolishedPDFInput): Promise<Bl
     // Use consistent typography for section title
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
-    doc.text('ORIGINAL TRANSCRIPT (Spanish)', margin, yPos);
+    doc.text(`ORIGINAL TRANSCRIPT (${detectedLanguage})`, margin, yPos);
     yPos += lineHeight * 1.5;
     
     // Set to normal Helvetica for plaintext rendering
@@ -467,9 +471,9 @@ export async function generatePolishedPDF(options: PolishedPDFInput): Promise<Bl
           yPos = margin;
           linesOnCurrentPage = 0;
           
-          // Add "continuado" indicator on new pages for Spanish
+          // Add "continued" indicator on new pages
           doc.setFont('helvetica', 'italic');
-          doc.text('(continuado)', margin, yPos);
+          doc.text('(continued)', margin, yPos);
           yPos += lineHeight * 1.5; // Extra space after continued indicator
           
           // Reset to normal font after indicator

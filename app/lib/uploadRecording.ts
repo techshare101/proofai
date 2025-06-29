@@ -39,7 +39,10 @@ async function generatePdfWithRetry(data: {
       
       // Format the summary as usual
       const formattedSummary = formatSummary(data.summary);
-      
+
+      // Format and store the summary for use in the PDF
+      // Note: No need to save as separate file
+
       // RADICAL FIX: Force videoUrl into formatted summary 
       if (typeof formattedSummary === 'object' && formattedSummary !== null) {
         formattedSummary.videoUrl = videoUrl;
@@ -82,9 +85,12 @@ async function generatePdfWithRetry(data: {
 
 interface UploadResult {
   transcript: string;
+  rawTranscript?: string; // Raw transcript field (same as transcript)
+  text?: string; // Additional field from Whisper API
   translatedTranscript: string;
   pdfResult: string;
   detectedLanguage: string;
+  language?: string; // Direct language field from Whisper API
   reportUrl: string;
 }
 
@@ -202,8 +208,17 @@ export async function uploadRecording(audioBlob: Blob, location: string): Promis
     
     // Send the signed URL to the transcription service instead of the blob
     const transcriptionResult = await transcriptionService.transcribe(signedUrl);
-    const transcript = transcriptionResult.text;
-    console.log('🎙️ Whisper Transcript:', transcript);
+    const transcript = transcriptionResult.text || '';
+    const rawTranscript = transcriptionResult.rawTranscript || transcriptionResult.transcript || transcript;
+    const detectedLanguage = transcriptionResult.detectedLanguage || transcriptionResult.language || '';
+    const language = transcriptionResult.language || detectedLanguage;
+    
+    console.log('🎙️ Whisper Transcript:', {
+      transcriptLength: transcript.length,
+      rawTranscriptLength: rawTranscript.length,
+      language: language || 'unknown',
+      detectedLanguage: detectedLanguage || 'unknown'
+    });
 
     // 7. Detect Language
     const languageDetected = await GPTService.detectLanguageWithGPT(transcript);
@@ -318,11 +333,15 @@ export async function uploadRecording(audioBlob: Blob, location: string): Promis
     const finalUrl = pdfResult || '';
     console.log('📄 Returning PDF URL:', finalUrl);
 
+    // Return transcript and PDF report URL with enhanced fields for non-English support
     return {
-      transcript,
+      transcript: rawTranscript || transcript, // Always use raw transcript as primary field
+      rawTranscript: rawTranscript || transcript, // Explicit raw transcript field
+      text: transcript, // Additional field for compatibility
       translatedTranscript,
       pdfResult: finalUrl, // Use the full URL as pdfResult
       detectedLanguage: languageDetected,
+      language, // Include direct language field
       reportUrl: finalUrl
     } as UploadResult;
   } catch (error) {

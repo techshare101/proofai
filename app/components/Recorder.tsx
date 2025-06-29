@@ -258,8 +258,25 @@ export default function Recorder() {
         }
 
         const result = await uploadRecording(blob, location);
-        setDetectedLanguage(result.detectedLanguage || '');
-        setTranscript(result.transcript || '');
+        // Set detected language from result (consistent field naming)
+        const detectedLang = result.language || result.detectedLanguage || '';
+        setDetectedLanguage(detectedLang);
+        
+        // Always use the raw transcript regardless of language
+        const rawTranscript = result.rawTranscript || result.transcript || result.text || '';
+        
+        console.log(`🗣 Setting transcript from Whisper result:`, {
+          rawTranscriptLength: rawTranscript.length,
+          language: detectedLang || 'unknown',
+          languageSource: result.language ? 'language field' : (result.detectedLanguage ? 'detectedLanguage field' : 'unknown')
+        });
+        
+        // Display transcript preview in console
+        if (rawTranscript) {
+          console.log(`🗣 Transcript preview (${detectedLang}): "${rawTranscript.substring(0, 50)}..."`);
+        }
+        
+        setTranscript(rawTranscript);
         setTranslatedText(result.translatedTranscript || '');
 
         // Check if not English and translation was enabled

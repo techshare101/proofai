@@ -1,5 +1,18 @@
 import { NextResponse } from "next/server";
 
+// List of languages supported by the application
+const supportedLangs = ['en', 'es', 'fr', 'de', 'zh', 'ja', 'ko', 'ru', 'pt', 'it'];
+
+// Check if detected language is supported
+function handleAutoDetect(whisperResponse: any) {
+  const lang = whisperResponse.language;
+  if (lang && supportedLangs.includes(lang)) {
+    return lang;
+  } else {
+    return 'unsupported';
+  }
+}
+
 export async function POST(req: Request) {
   // Parse FormData instead of JSON
   const formData = await req.formData();
@@ -47,7 +60,17 @@ export async function POST(req: Request) {
     const form = new FormData();
     form.append("file", file);
     form.append("model", "whisper-1");
-    form.append("language", language);
+    form.append("response_format", "json");
+    form.append("temperature", "0");
+    
+    // Only include language parameter if explicitly specified and not 'auto'
+    // Omitting the language parameter allows Whisper to perform better auto-detection
+    if (language && language !== "auto") {
+      console.log(`🔤 Using specified language: ${language}`);
+      form.append("language", language);
+    } else {
+      console.log("🔤 Language parameter omitted for better auto-detection");
+    }
 
     // Step 3: Send to OpenAI
     console.log("🔄 Calling OpenAI Whisper API...");
@@ -77,7 +100,41 @@ export async function POST(req: Request) {
     }
 
     console.log("✅ Transcription successful");
-    return NextResponse.json(result);
+    
+    // Check if detected language is supported
+    const detectedLang = handleAutoDetect(result);
+    console.log(`🌐 Detected language: ${result.language || 'unknown'}, Supported: ${detectedLang !== 'unsupported' ? 'Yes' : 'No'}`);
+    
+    // Get original/raw transcript from result
+    const rawText = result.text || '';
+    
+    // Always ensure the raw transcript is available under multiple fields for compatibility
+    // This ensures all languages work like Spanish - with proper raw transcript access
+    const enhancedResult = {
+      ...result,
+      text: rawText,
+      transcript: rawText, // Ensure transcript field always exists
+      rawTranscript: rawText, // Add explicit rawTranscript field
+      detected_language: result.language || detectedLang,
+      language: result.language || detectedLang, // Add language field for consistency
+      supported_language: detectedLang,
+      is_translated: false, // Flag to indicate if this is a translated transcript
+    };
+    
+    // Add detailed logging about transcript
+    console.log(`🌐 Language details:`, {
+      requestedLanguage: language || 'auto',
+      detectedLanguage: enhancedResult.language || 'unknown',
+      isSupported: detectedLang !== 'unsupported',
+      transcriptLength: rawText.length,
+    });
+    
+    console.log(`📝 Raw transcript available: ${enhancedResult.transcript ? 'Yes' : 'No'} (${enhancedResult.transcript?.length || 0} chars)`);
+    if (enhancedResult.transcript?.length > 0) {
+      console.log(`📝 Transcript preview: "${enhancedResult.transcript.substring(0, 50)}..."`);
+    }
+    
+    return NextResponse.json(enhancedResult);
   } catch (err) {
     console.error("❌ API error:", err);
     // Include more detailed error information

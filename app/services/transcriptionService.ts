@@ -1,6 +1,10 @@
 export interface TranscriptionResult {
   text: string;
+  transcript?: string;
+  rawTranscript?: string;
   detectedLanguage?: string;
+  language?: string;
+  supported_language?: string;
 }
 
 interface TranslationResult {
@@ -71,13 +75,15 @@ export class TranscriptionService {
         endpoint: 'transcriptions'
         // API key is handled by the server-side endpoint
       });
-      // Add optional parameters
-      // API requires valid ISO-639-1 language code, default to 'en' if not specified or 'auto'
-      if (language && language !== 'auto') {
+      // Add language parameter only if explicitly specified and not 'auto'
+      // This allows Whisper to perform optimal auto-detection for all languages
+      if (language && language !== 'auto' && language.trim() !== '') {
+        console.log(`🔤 Passing explicit language to API: ${language}`);
         formDataForAPI.append('language', language);
       } else {
-        // Default to English if no language is specified or 'auto' is used
-        formDataForAPI.append('language', 'en');
+        console.log('🔤 Using auto-detection mode (no language parameter)');
+        // Do not append any language parameter when auto is selected
+        // This allows the API to use Whisper's best auto-detection
       }
       if (translateToEnglish) {
         formDataForAPI.append('translateToEnglish', 'true');
