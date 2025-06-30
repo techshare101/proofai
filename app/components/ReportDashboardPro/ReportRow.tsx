@@ -36,26 +36,30 @@ export default function ReportRow({
         damping: 10
       }
     }),
-    exit: { opacity: 0, y: -10, transition: { duration: 0.2 } }
+    exit: { opacity: 0, y: -10, transition: { duration: 0.2 } },
+    deleting: { 
+      opacity: 0.5,
+      filter: "grayscale(100%)",
+      transition: { duration: 0.3 }
+    }
   };
   
   const handleDelete = async () => {
     if (window.confirm(`Are you sure you want to delete "${report.title}"?`)) {
       try {
+        console.log(`[DeleteStrike] ReportRow initiating delete for report: ${report.id}`);
         setIsDeleting(true);
-        const { error } = await supabase
-          .from('reports')
-          .delete()
-          .eq('id', report.id);
-
-        if (error) throw error;
         
-        toast.success('Report deleted successfully');
-        onDelete(report.id);
+        // Call the parent's delete handler which handles the Supabase deletion
+        // Note: We're keeping the row in "deleting" visual state permanently
+        // The parent component should handle removing it from the list
+        await onDelete(report.id);
+        
+        // We don't reset isDeleting because the row should disappear from UI
+        // If it's still visible, it should remain in deleting state
       } catch (error) {
-        console.error('Error deleting report:', error);
+        console.error('[DeleteStrike] Error in ReportRow delete handler:', error);
         toast.error('Failed to delete report');
-      } finally {
         setIsDeleting(false);
       }
     }
@@ -63,10 +67,10 @@ export default function ReportRow({
 
   return (
     <motion.tr
-      className="border-t border-gray-200 hover:bg-gray-50 transition-colors"
+      className={`border-t border-gray-200 hover:bg-gray-50 transition-colors ${isDeleting ? 'pointer-events-none' : ''}`}
       custom={index}
       initial="hidden"
-      animate="visible"
+      animate={isDeleting ? "deleting" : "visible"}
       exit="exit"
       variants={rowVariants}
       layout

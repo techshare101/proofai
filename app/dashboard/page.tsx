@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '../contexts/AuthContext'
 import supabase from '../lib/supabase'
+import toast from 'react-hot-toast'
 import Link from 'next/link'
 import ReportCard, { Report } from '../components/dashboard/ReportCard'
 import { DndContext, DragEndEvent, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
@@ -109,8 +110,203 @@ export default function DashboardPage() {
     }
   }
   
-  const handleDeleteReport = (reportId: string) => {
-    setReports(reports.filter(report => report.id !== reportId))
+  const handleDeleteReport = async (reportId: string) => {
+    try {
+      // Store original reports for potential rollback
+      const originalReports = [...reports];
+      
+      // Show loading toast
+      const loadingToast = toast.loading("Deleting report...");
+      
+      console.log(`[GridPurge-GRID] Starting deletion process for report: ${reportId}`);
+      
+      // STEP 0: RADICAL OPTIMISTIC UI UPDATE - Remove from UI immediately
+      console.log(`[GridPurge-GRID] RADICAL UI UPDATE: Removing report ${reportId} instantly`);
+      
+      // Get the report we're deleting for visual feedback
+      const reportToDelete = reports.find(r => r.id === reportId);
+      
+      // Apply a fade-out effect by updating UI state immediately
+      setReports(prevReports => prevReports.filter(report => report.id !== reportId));
+      
+      // STEP 1: Find the report to get file URLs before deletion
+      console.log(`[GridPurge-GRID] Fetching report data to get file URLs...`);
+      const { data: reportData, error: fetchError } = await supabase
+        .from('reports')
+        .select('id, pdf_url, file_url')
+        .eq('id', reportId)
+        .single();
+      
+      if (fetchError) {
+        console.error(`[GridPurge-GRID] Failed to fetch report data:`, fetchError);
+        toast.error(`Could not find report: ${fetchError.message}`, { id: loadingToast });
+        return false;
+      }
+      
+      console.log(`[GridPurge-GRID] Found report:`, reportData);
+      
+      // STEP 2: Delete PDF from storage if it exists
+      if (reportData.pdf_url) {
+        try {
+          console.log(`[GridPurge-GRID] Deleting PDF: ${reportData.pdf_url}`);
+          
+          // Extract path from URL if it's a full URL
+          let pdfPath = reportData.pdf_url;
+          if (pdfPath.startsWith('http')) {
+            try {
+              const url = new URL(pdfPath);
+              const pathParts = url.pathname.split('/');
+              // Last part is usually the filename
+              if (pathParts.length >= 1) {
+                pdfPath = pathParts[pathParts.length - 1];
+                console.log(`[GridPurge-GRID] Extracted PDF path: ${pdfPath}`);
+              }
+            } catch (e) {
+              console.error('[GridPurge-GRID] Could not parse PDF URL', e);
+            }
+          }
+          
+          // Try multiple buckets to ensure PDF deletion
+          const buckets = ['proofai-pdfs', 'pdfs', 'reports', 'public'];
+          for (const bucket of buckets) {
+            try {
+              const { error: deleteError } = await supabase.storage
+                .from(bucket)
+                .remove([pdfPath]);
+                
+              if (!deleteError) {
+                console.log(`[GridPurge-GRID] Successfully deleted PDF from ${bucket}`);
+                break; // Stop if successful
+              }
+            } catch (e) {
+              console.log(`[GridPurge-GRID] Error deleting PDF from ${bucket}:`, e);
+            }
+          }
+        } catch (pdfError) {
+          console.error('[GridPurge-GRID] Error deleting PDF:', pdfError);
+          // Continue even if PDF deletion fails
+        }
+      }
+      
+      // Delete other file from storage if it exists
+      if (reportData.file_url) {
+        try {
+          console.log(`[GridPurge-GRID] Deleting file: ${reportData.file_url}`);
+          
+          // Extract path from URL if it's a full URL
+          let filePath = reportData.file_url;
+          if (filePath.startsWith('http')) {
+            try {
+              const url = new URL(filePath);
+              const pathParts = url.pathname.split('/');
+              // Last part is usually the filename
+              if (pathParts.length >= 1) {
+                filePath = pathParts[pathParts.length - 1];
+                console.log(`[GridPurge-GRID] Extracted file path: ${filePath}`);
+              }
+            } catch (e) {
+              console.error('[GridPurge-GRID] Could not parse file URL', e);
+            }
+          }
+          
+          // Try multiple buckets to ensure file deletion
+          const buckets = ['recordings', 'files', 'reports', 'uploads', 'audio'];
+          for (const bucket of buckets) {
+            try {
+              const { error: deleteError } = await supabase.storage
+                .from(bucket)
+                .remove([filePath]);
+                
+              if (!deleteError) {
+                console.log(`[GridPurge-GRID] Successfully deleted file from ${bucket}`);
+                break; // Stop if successful
+              }
+            } catch (e) {
+              console.log(`[GridPurge-GRID] Error deleting file from ${bucket}:`, e);
+            }
+          }
+        } catch (fileError) {
+          console.error('[GridPurge-GRID] Error deleting file:', fileError);
+          // Continue even if file deletion fails
+        }
+      }
+      
+      // STEP 3: Confirm UI state is updated
+      console.log(`[GridPurge-GRID] UI state already updated optimistically...`);
+      
+      // STEP 4: Delete from database
+      console.log(`[GridPurge-GRID] Deleting report from database: ${reportId}`);
+      const { data, error, status } = await supabase
+        .from('reports')
+        .delete()
+        .eq('id', reportId);
+      
+      // Log full response details for debugging
+      console.log(`[GridPurge-GRID] Database delete response:`, { 
+        data, error, status,
+        fullError: error ? JSON.stringify(error) : 'none'
+      });
+      
+      if (error) {
+        // Rollback UI update if database deletion fails
+        console.error(`[GridPurge-GRID] Delete failed:`, error);
+        setReports(originalReports);
+        toast.error(`Delete failed: ${error.message}`, { id: loadingToast });
+        return false;
+      }
+      
+      console.log(`[GridPurge-GRID] Report deleted from database successfully`);
+      
+      // STEP 5: Clean up any empty folders
+      try {
+        // Get all folders
+        const { data: folders, error: foldersError } = await supabase
+          .from('folders')
+          .select('id, name');
+          
+        if (foldersError) throw foldersError;
+        
+        // For each folder, check if it has any reports
+        for (const folder of folders || []) {
+          // Skip the Uncategorized folder
+          if (folder.name === 'Uncategorized') continue;
+          
+          // Count reports in this folder
+          const { count, error: countError } = await supabase
+            .from('reports')
+            .select('id', { count: 'exact' })
+            .eq('folder_id', folder.id);
+          
+          if (countError) throw countError;
+          
+          // If no reports, delete the folder
+          if (count === 0) {
+            console.log(`[GridPurge-GRID] Removing empty folder: ${folder.name}`);
+            const { error: deleteError } = await supabase
+              .from('folders')
+              .delete()
+              .eq('id', folder.id);
+              
+            if (deleteError) throw deleteError;
+          }
+        }
+      } catch (folderError) {
+        console.error('[GridPurge-GRID] Error cleaning up folders:', folderError);
+        // We don't revert the report deletion even if folder cleanup fails
+      }
+      
+      // Success notification
+      toast.success("Report and associated files deleted successfully", { id: loadingToast });
+      
+      // STEP 6: Force refresh data from server
+      console.log(`[GridPurge-GRID] Refreshing data from server...`);
+      fetchReports();
+      return true;
+    } catch (err) {
+      console.error('[GridPurge-GRID] Uncaught error in handleDeleteReport:', err);
+      toast.error(`Delete failed: ${err?.message || "Something went wrong"}`);
+      return false;
+    }
   }
   
   // Handle report dropped in folder

@@ -2,6 +2,50 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import toast from 'react-hot-toast';
 
+// Shared folder cleanup logic for both grid and list views
+export const cleanupEmptyFolders = async () => {
+  const supabase = createClientComponentClient();
+  
+  try {
+    // Get all folders
+    const { data: folders, error: foldersError } = await supabase
+      .from('folders')
+      .select('id, name');
+      
+    if (foldersError) throw foldersError;
+    
+    // For each folder, check if it has any reports
+    for (const folder of folders || []) {
+      // Skip the Uncategorized folder - we always keep this
+      if (folder.name === 'Uncategorized') continue;
+      
+      // Count reports in this folder
+      const { count, error: countError } = await supabase
+        .from('reports')
+        .select('id', { count: 'exact' })
+        .eq('folder_id', folder.id);
+      
+      if (countError) throw countError;
+      
+      // If no reports, delete the folder
+      if (count === 0) {
+        console.log(`[GridPurge] Removing empty folder: ${folder.name} (${folder.id})`);
+        const { error: deleteError } = await supabase
+          .from('folders')
+          .delete()
+          .eq('id', folder.id);
+          
+        if (deleteError) throw deleteError;
+      }
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('[GridPurge] Error cleaning up empty folders:', error);
+    return false;
+  }
+};
+
 export async function deleteReportWithFiles(reportId: string) {
   const supabase = createClientComponentClient();
   
@@ -111,7 +155,21 @@ export async function deleteReportWithFiles(reportId: string) {
       throw deleteError;
     }
     
+    console.log('[GridPurge] Report deleted successfully, cleaning up folders...');
+    
+    // Clean up empty folders
+    await cleanupEmptyFolders();
+    
+    // Show success notification
     toast.success('Report and associated files deleted successfully');
+    
+    // Force a page refresh to ensure all components update
+    // This is an immediate solution, but a more elegant approach would be
+    // to use a state management system or context to notify all components
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);  // Small delay to ensure toast is visible
+    
     return true;
   } catch (error: any) {
     console.error('Error in deleteReportWithFiles:', error);

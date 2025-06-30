@@ -1,21 +1,24 @@
 'use client'
 
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { TranscriptionService } from '../services/transcriptionService'
 import { useRouter } from 'next/navigation'
 import { uploadRecording } from '@/lib/uploadRecording';
 import { useAuth } from '../contexts/AuthContext';
 import { useRecorder } from '../hooks/useRecorder';
 import { toast } from 'react-hot-toast';
+import { formatRecordingTime } from '../../lib/recordingLimits';
+import { useRecordGuard } from '../../hooks/useRecordGuard';
+import RecorderPlanDebug from './RecorderPlanDebug';
 
 type RecorderStatus = 'idle' | 'requesting' | 'ready' | 'recording' | 'uploading' | 'error';
 
-const StatusMessage = ({ status, error, recordingTime }: { status: RecorderStatus; error?: string; recordingTime?: number }) => {
+// Import maxRecordingDuration for the StatusMessage component
+const StatusMessage = ({ status, error, recordingTime, maxDuration }: { status: RecorderStatus; error?: string; recordingTime?: number; maxDuration?: number }) => {
   // Format seconds to MM:SS
+  // Now using the shared utility function from recordingLimits.ts
   function formatTime(seconds: number): string {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+    return formatRecordingTime(seconds);
   }
 
   const messages: Record<RecorderStatus, string> = {
@@ -37,9 +40,12 @@ const StatusMessage = ({ status, error, recordingTime }: { status: RecorderStatu
         <p>{messages[status]}</p>
       )}
       
-      {recordingTime !== undefined && status === 'recording' && (
+      {recordingTime !== undefined && status === 'recording' && maxDuration !== undefined && (
         <div className="text-lg font-bold text-center mt-2">
-          Recording Time: {formatTime(recordingTime)}
+          Recording Time: {formatRecordingTime(recordingTime)} 
+          <span className="text-sm text-gray-500 ml-2">
+            (Limit: {formatRecordingTime(maxDuration)})
+          </span>
         </div>
       )}
     </div>
@@ -48,6 +54,7 @@ const StatusMessage = ({ status, error, recordingTime }: { status: RecorderStatu
 
 export default function Recorder() {
   const router = useRouter()
+  const { session } = useAuth();
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const [recording, setRecording] = useState(false)
@@ -68,11 +75,31 @@ export default function Recorder() {
   // Camera toggle functionality
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user")
   
-  // Recording time tracking
-  const [recordingTime, setRecordingTime] = useState(0)
-  const recordingTimer = useRef<NodeJS.Timeout | null>(null)
-  // Remove fixed time limit to allow extended recording
-  // Browser memory limits will naturally constrain maximum recording time
+  // Debug plan override for testing
+  const [debugPlan, setDebugPlan] = useState<string>('');
+  
+  // Reference to the same stop function triggered by the button
+  const handleStopRecording = useCallback(() => {
+    console.log('[RecordGuard] Limit reached - triggering full stop recording flow');
+    if (recording) {
+      stopRecording(); // This will trigger the full recording flow including upload and transcription
+    }
+  }, [recording]); // Re-create when recording state changes
+  
+  // RecordGuard integration
+  const recordGuard = useRecordGuard({
+    onLimitReached: handleStopRecording, // Use the same handler as the stop button
+    debugOverridePlan: debugPlan
+  });
+  
+  // Extract values from record guard
+  const { 
+    recordingTime, 
+    remainingTime,
+    maxDuration: maxRecordingDuration,
+    userPlan,
+    formatTime
+  } = recordGuard;
 
   // Toggle between front and back cameras
   const toggleCamera = () => {
@@ -129,10 +156,45 @@ export default function Recorder() {
     try {
       // Ensure we include audio for Whisper transcription and use facingMode
       console.log(`Attempting to get user media with audio and facingMode: ${facingMode}...`);
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode }, // Use facingMode state to control camera direction
-        audio: true, // Audio required for Whisper transcription
-      });
+      // Calculate constraints based on recording duration limits
+      // For longer recording plans, use much lower quality to stay under Whisper limits
+      const maxRecordingSeconds = recordGuard.maxDuration;
+      
+      // Define video constraints with proper TypeScript typing
+      let videoConstraints: MediaTrackConstraints = { 
+        facingMode: facingMode as "user" | "environment" 
+      };
+      
+      if (maxRecordingSeconds <= 120) { // 2 minutes or less (free/starter)
+        videoConstraints = {
+          facingMode: facingMode as "user" | "environment",
+          width: { ideal: 640 },
+          height: { ideal: 360 },
+          frameRate: { ideal: 15 }
+        };
+      } else if (maxRecordingSeconds <= 600) { // 10 minutes or less (pro/enterprise)
+        videoConstraints = {
+          facingMode: facingMode as "user" | "environment",
+          width: { ideal: 480 },
+          height: { ideal: 270 }, 
+          frameRate: { ideal: 10 }
+        };
+      } else { // 30 minutes (legal plan)
+        videoConstraints = {
+          facingMode: facingMode as "user" | "environment",
+          width: { ideal: 320 },
+          height: { ideal: 180 },
+          frameRate: { ideal: 8 }
+        };
+      }
+      
+      console.log(`Using video quality settings for ${recordGuard.userPlan} plan (${maxRecordingSeconds}s):`, videoConstraints);
+      
+      const constraints = {
+        audio: true,
+        video: videoConstraints
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
       streamRef.current = stream;
       if (videoRef.current) {
@@ -199,23 +261,50 @@ export default function Recorder() {
     }
 
     try {
-      // Reset recording time
-      setRecordingTime(0);
+      // Reset recording time - we'll let RecordGuard handle this now
       
-      // Setup recording timer
-      if (recordingTimer.current) {
-        clearInterval(recordingTimer.current);
-      }
-      
-      // Set up a timer to track recording duration without enforcing a limit
-      recordingTimer.current = setInterval(() => {
-        setRecordingTime(prevTime => prevTime + 1);
-      }, 1000);
+      // Start RecordGuard timer which will auto-stop when limit is reached
+      recordGuard.startRecordingTimer();
 
       setStatus('recording');
-      const recorder = new MediaRecorder(stream, {
-        mimeType: 'video/webm;codecs=vp8,opus'
-      });
+      // Test for codec support first to avoid errors
+      let options = {};
+      
+      // Set bitrates based on recording duration limits
+      const maxRecDuration = recordGuard.maxDuration;
+      let videoBitrate = 200000; // 200 kbps default
+      let audioBitrate = 32000;  // 32 kbps default
+      
+      if (maxRecDuration > 600) { // 30 minutes (legal plan)
+        videoBitrate = 100000;   // Ultra low 100 kbps
+        audioBitrate = 24000;    // Lower audio quality
+      } else if (maxRecDuration > 120) { // 5-10 min (pro/enterprise)
+        videoBitrate = 150000;   // Very low 150 kbps
+        audioBitrate = 28000;    // Reduced audio quality
+      }
+      
+      // Try different codecs in order of preference
+      if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')) {
+        options = {
+          mimeType: 'video/webm;codecs=vp8,opus',
+          videoBitsPerSecond: videoBitrate,
+          audioBitsPerSecond: audioBitrate
+        };
+        console.log('Using vp8 codec with specified bitrates');
+      } else if (MediaRecorder.isTypeSupported('video/webm')) {
+        options = {
+          mimeType: 'video/webm',
+          videoBitsPerSecond: videoBitrate,
+          audioBitsPerSecond: audioBitrate
+        };
+        console.log('Using default webm codec with specified bitrates');
+      } else {
+        // Fallback with no options - use browser defaults
+        options = {};
+        console.log('Using browser default codec settings');
+      }
+      
+      const recorder = new MediaRecorder(stream, options);
 
       chunks.current = [];
 
@@ -226,10 +315,7 @@ export default function Recorder() {
       recorder.onstop = async () => {
         console.log('MediaRecorder onstop event triggered');
         // Clear the recording timer when recording stops
-        if (recordingTimer.current) {
-          clearInterval(recordingTimer.current);
-          recordingTimer.current = null;
-        }
+        recordGuard.stopRecordingTimer();
         
         setStatus('uploading');
         const blob = new Blob(chunks.current, { type: 'video/webm' });
@@ -303,23 +389,27 @@ export default function Recorder() {
       setError(`Recording error: ${e instanceof Error ? e.message : String(e)}`);
       setStatus('error');
       
-      // Clear the recording timer on error
-      if (recordingTimer.current) {
-        clearInterval(recordingTimer.current);
-        recordingTimer.current = null;
-      }
+      // Stop the recording timer using RecordGuard
+      recordGuard.stopRecordingTimer();
     }
   };
 
   const stopRecording = () => {
-    console.log('Stop recording button clicked');
-    if (mediaRecorder?.state === 'recording') {
-      console.log('Stopping media recorder...');
-      mediaRecorder.stop();
-      setRecording(false);
-    } else {
-      console.warn(`MediaRecorder not in recording state. Current state: ${mediaRecorder?.state || 'undefined'}`);
+    console.log('Stopping recording...');
+    
+    if (!recording || !mediaRecorder) {
+      console.log('Nothing to stop, no active recording.');
+      return;
     }
+    
+    // Guard against stopping a MediaRecorder that's not in recording state
+    if (mediaRecorder.state !== 'recording') {
+      console.warn("MediaRecorder not in recording state. Current state:", mediaRecorder.state);
+      return;
+    }
+    
+    mediaRecorder.stop();
+    setRecording(false);
   };
 
   const retryCamera = async () => {
@@ -364,9 +454,17 @@ export default function Recorder() {
           </div>
         )}
       </div>
+      
+      {/* Add debug panel to test different plans */}
+      <RecorderPlanDebug onPlanChange={setDebugPlan} currentPlan={userPlan} />
 
       <div className="flex flex-col items-center space-y-4">
-        <StatusMessage status={status} error={error} recordingTime={recording ? recordingTime : undefined} />
+        <StatusMessage
+            status={status}
+            error={error}
+            recordingTime={recordingTime}
+            maxDuration={maxRecordingDuration}
+          />
 
         {/* Advanced Settings Button */}
         <div className="mt-2">
@@ -466,11 +564,11 @@ export default function Recorder() {
         )}
 
         {/* Camera Toggle Button - Moved to top for better visibility */}
-        <div className="flex justify-center w-full my-4">
+        <div className="flex flex-col items-center w-full my-4">
           <button
             onClick={toggleCamera}
             disabled={recording}
-            className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700 transition flex items-center justify-center gap-2 text-lg font-medium"
+            className="px-4 py-2 mb-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700 transition flex items-center justify-center gap-2 text-lg font-medium"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
               <path d="M15 12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h1.172a3 3 0 0 0 2.12-.879l.83-.828A1 1 0 0 1 6.827 3h2.344a1 1 0 0 1 .707.293l.828.828A3 3 0 0 0 12.828 5H14a1 1 0 0 1 1 1v6zM2 4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-1.172a2 2 0 0 1-1.414-.586l-.828-.828A2 2 0 0 0 9.172 2H6.828a2 2 0 0 0-1.414.586l-.828.828A2 2 0 0 1 3.172 4H2z"/>
@@ -478,6 +576,30 @@ export default function Recorder() {
             </svg>
             {facingMode === "user" ? "Switch to Back Camera" : "Switch to Front Camera"}
           </button>
+          
+          {/* RecordGuard: Recording limit indicator */}
+          <div className="w-full max-w-md p-2 bg-gray-50 border border-gray-200 rounded-lg">
+            <div className="flex items-center justify-between mb-1 text-xs">
+              <span>Plan Limit: {formatRecordingTime(maxRecordingDuration)}</span>
+              <span className={remainingTime < 30 ? "text-red-600 font-bold" : "text-gray-600"}>
+                {recording ? `Time Remaining: ${formatRecordingTime(remainingTime)}` : "Ready to Record"}
+              </span>
+            </div>
+            
+            {recording && (
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div 
+                  className={`h-2.5 rounded-full ${remainingTime < 30 ? "bg-red-600" : "bg-blue-600"}`} 
+                  style={{ width: `${(recordingTime / maxRecordingDuration) * 100}%` }}
+                ></div>
+              </div>
+            )}
+            
+            {/* User plan indicator */}
+            <div className="text-[10px] text-gray-500 mt-1 text-right">
+              Current plan: <span className="font-medium capitalize">{userPlan}</span>
+            </div>
+          </div>
         </div>
 
         <div className="flex justify-center space-x-4">

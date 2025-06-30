@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaRegFilePdf, FaTimes, FaMapMarkerAlt, FaRegClock } from 'react-icons/fa';
 import { formatDate, formatRelativeTime, Report } from './utils';
+import { toast } from 'react-hot-toast';
 
 interface ReportViewModalProps {
   report: Report;
@@ -11,6 +12,8 @@ interface ReportViewModalProps {
 }
 
 export default function ReportViewModal({ report, onClose }: ReportViewModalProps) {
+  const [isLoadingFile, setIsLoadingFile] = useState(false);
+  
   // Close on escape key press
   useEffect(() => {
     const handleEsc = (event: KeyboardEvent) => {
@@ -22,6 +25,25 @@ export default function ReportViewModal({ report, onClose }: ReportViewModalProp
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
   }, [onClose]);
+
+  // Handle file view with validation
+  const handleFileView = () => {
+    if (!report.file_url || report.file_url.trim() === '') {
+      toast.error("No file available for download");
+      return;
+    }
+
+    setIsLoadingFile(true);
+    
+    // Format URL properly
+    const fileUrl = report.file_url.startsWith('http') 
+      ? report.file_url 
+      : `https://${report.file_url.replace(/^\/*/, '')}`;
+    
+    // Open in new tab
+    window.open(fileUrl, '_blank');
+    setIsLoadingFile(false);
+  };
 
   return (
     <AnimatePresence>
@@ -96,15 +118,14 @@ export default function ReportViewModal({ report, onClose }: ReportViewModalProp
           
           {/* Footer */}
           <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end">
-            {report.file_url && (
-              <a 
-                href={report.file_url} 
-                target="_blank"
-                rel="noopener noreferrer"
+            {report.file_url && report.file_url.trim() !== '' && (
+              <button 
+                onClick={handleFileView}
+                disabled={isLoadingFile}
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 mr-3"
               >
-                View File
-              </a>
+                {isLoadingFile ? 'Loading...' : 'View File'}
+              </button>
             )}
             <button
               onClick={onClose}
