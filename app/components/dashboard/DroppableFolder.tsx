@@ -4,6 +4,8 @@ import { useDroppable } from '@dnd-kit/core'
 import { ReactNode } from 'react'
 import FolderContextMenu from './FolderContextMenu'
 import supabase from '@/lib/supabase'
+import { deleteFolder } from '@/supabase/deleteFolder'
+import toast from 'react-hot-toast'
 
 interface DroppableFolderProps {
   id: string
@@ -45,23 +47,24 @@ export default function DroppableFolder({ id, isActive, onFolderClick, children,
   
   const handleDeleteFolder = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('folders')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', userId);
-        
-      if (error) throw error;
+      toast.loading('Deleting folder...', { id: 'deleteFolderContext' });
+      // Use the comprehensive deleteFolder function
+      const result = await deleteFolder(id, userId);
       
-      if (onFolderDeleted) {
-        onFolderDeleted();
+      if (result.success) {
+        toast.success('Folder deleted successfully!', { id: 'deleteFolderContext' });
+        if (onFolderDeleted) {
+          onFolderDeleted();
+        } else {
+          // Refresh the page to reflect changes
+          window.location.reload();
+        }
       } else {
-        // Refresh the page to reflect changes
-        window.location.reload();
+        toast.error(`Failed to delete folder: ${result.error}`, { id: 'deleteFolderContext' });
       }
     } catch (err) {
       console.error('Error deleting folder:', err);
-      alert('Failed to delete folder');
+      toast.error('Failed to delete folder', { id: 'deleteFolderContext' });
     }
   };
 

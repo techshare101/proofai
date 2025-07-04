@@ -1,8 +1,9 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
 import supabase from '@/lib/supabase'
-import { deleteFolder } from '../../../supabase/deleteFolder'
+import { deleteFolder } from '@/supabase/deleteFolder'
 import DroppableFolder from './DroppableFolder'
+import toast from 'react-hot-toast'
 
 interface Folder {
   id: string
@@ -23,6 +24,25 @@ export default function FolderSidebar({ userId, onReportDrop, className = '' }: 
   const [isCreating, setIsCreating] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
 
+  // Track deleted folder IDs using localStorage
+  const getDeletedFolderIds = () => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('deletedFolderIds')
+      return saved ? JSON.parse(saved) : []
+    }
+    return []
+  }
+  
+  const addDeletedFolderId = (id: string) => {
+    if (typeof window !== 'undefined') {
+      const deletedIds = getDeletedFolderIds()
+      if (!deletedIds.includes(id)) {
+        deletedIds.push(id)
+        localStorage.setItem('deletedFolderIds', JSON.stringify(deletedIds))
+      }
+    }
+  }
+
   useEffect(() => {
     if (userId) {
       fetchFolders()
@@ -41,11 +61,20 @@ export default function FolderSidebar({ userId, onReportDrop, className = '' }: 
       
       if (error) throw error
       
-      setFolders(data || [])
+      // Filter out any folders that we've marked as deleted in localStorage
+      const deletedIds = getDeletedFolderIds()
+      const filteredData = (data || []).filter(folder => !deletedIds.includes(folder.id))
+      
+      console.log(`Fetched ${data?.length || 0} folders, filtered out ${(data?.length || 0) - filteredData.length} deleted folders`)
+      setFolders(filteredData)
       
       // Set the first folder as active by default
-      if (data && data.length > 0 && !activeFolder) {
-        setActiveFolder(data[0].id)
+      if (filteredData.length > 0 && !activeFolder) {
+        setActiveFolder(filteredData[0].id)
+      } else if (filteredData.length === 0) {
+        // No folders left, clear the active folder
+        setActiveFolder(null)
+        window.dispatchEvent(new CustomEvent('folderChange', { detail: { folderId: null } }))
       }
     } catch (err: any) {
       console.error('Error fetching folders:', err)
@@ -91,8 +120,18 @@ export default function FolderSidebar({ userId, onReportDrop, className = '' }: 
 
   return (
     <aside className={`w-64 bg-white border-r border-gray-200 p-4 overflow-y-auto ${className}`}>
-      <div className="mb-6">
-        <h2 className="text-lg font-semibold text-gray-800">Folders</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-medium text-gray-900">Folders</h2>
+        <button 
+          onClick={() => fetchFolders()} 
+          className="text-sm text-blue-500 hover:text-blue-700 flex items-center"
+          title="Refresh folder list"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Refresh
+        </button>
       </div>
       
       {/* Folder list */}
@@ -125,17 +164,40 @@ export default function FolderSidebar({ userId, onReportDrop, className = '' }: 
                 onClick={(e) => {
                   e.stopPropagation();
                   if (confirm('Delete this folder?')) {
-                    deleteFolder(folder.id, userId).then(() => {
-                      // Re-fetch the folders list
-                      fetchFolders();
-                      // If the active folder was deleted, reset to null
-                      if (activeFolder === folder.id) {
-                        setActiveFolder(null);
-                        // Dispatch event with null folderId
-                        window.dispatchEvent(new CustomEvent('folderChange', { detail: { folderId: null } }));
+                    toast.loading('Deleting folder...', { id: 'deleteFolder' });
+                    deleteFolder(folder.id, userId).then((result) => {
+                      if (result.success) {
+                        toast.success('Folder deleted successfully!', { id: 'deleteFolder' });
+                        // Re-fetch the folders list
+                        fetchFolders();
+                        // If the active folder was deleted, reset to null
+                        if (activeFolder === folder.id) {
+                          setActiveFolder(null);
+                          // Dispatch event with null folderId
+                          window.dispatchEvent(new CustomEvent('folderChange', { detail: { folderId: null } }));
+                        }
+                      } else {
+                        // If we get an error saying the folder doesn't exist, remove it from the UI
+                        if (result.error && typeof result.error === 'string' && 
+                            (result.error.includes('not found') || result.error.includes('No rows'))) {
+                          console.log(`Removing non-existent folder ${folder.id} from UI`);
+                          
+                          // Add to localStorage deleted folders list to prevent it from showing up again
+                          addDeletedFolderId(folder.id);
+                          
+                          // Remove the folder from our local state since it doesn't exist in the DB
+                          setFolders(currentFolders => 
+                            currentFolders.filter(f => f.id !== folder.id)
+                          );
+                          toast.success('Folder removed from UI', { id: 'deleteFolder' });
+                        } else {
+                          toast.error(`Failed to delete folder: ${result.error}`, { id: 'deleteFolder' });
+                          setError(`Failed to delete folder: ${result.error}`);
+                        }
                       }
                     }).catch(err => {
                       console.error('Error deleting folder:', err);
+                      toast.error('Failed to delete folder', { id: 'deleteFolder' });
                       setError('Failed to delete folder');
                     });
                   }

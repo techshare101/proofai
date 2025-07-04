@@ -46,16 +46,29 @@ export function DownloadReportButton({ summaryData }: { summaryData: ReportData 
         excerpt: summaryData.transcriptText.substring(0, 100) + '...'
       });
 
-      // Include language in the PDF generation request
-      const pdfRequestData = {
-        ...summaryData,
-        language: language // Ensure language is included at the top level
+      // Format the data according to what the API expects
+      const structuredSummary = {
+        caseId: summaryData.metadata?.caseId || `case-${Date.now()}`,
+        location: summaryData.summary.location || 'Unknown Location',
+        participants: summaryData.summary.keyParticipants ? 
+          (Array.isArray(summaryData.summary.keyParticipants) ? 
+            summaryData.summary.keyParticipants : 
+            [summaryData.summary.keyParticipants]) : 
+          undefined,
+        relevance: summaryData.summary.legalRelevance,
+        summaryText: summaryData.summary.summary,
+        transcriptText: summaryData.transcriptText,
+        timestamp: new Date().toISOString(),
+        userId: summaryData.metadata?.userName || 'Unknown',
+        generatedBy: 'ProofAI Whisper Bot'
       };
+      
+      console.log('📄 Sending structured summary to PDF API:', structuredSummary);
       
       const response = await fetch('/api/generate-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: pdfRequestData })
+        body: JSON.stringify({ structuredSummary })
       });
 
       if (response.ok) {

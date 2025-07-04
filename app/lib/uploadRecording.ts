@@ -37,22 +37,42 @@ async function generatePdfWithRetry(data: {
       
       console.log('🔗 USING VIDEO URL FOR PDF:', videoUrl);
       
-      // Format the summary as usual
-      const formattedSummary = formatSummary(data.summary);
+      // Get the formatted summary string
+      // Note: formatSummary returns a string, not an object
+      const formattedSummaryText = formatSummary(data.summary);
 
-      // Format and store the summary for use in the PDF
-      // Note: No need to save as separate file
-
-      // RADICAL FIX: Force videoUrl into formatted summary 
-      if (typeof formattedSummary === 'object' && formattedSummary !== null) {
-        formattedSummary.videoUrl = videoUrl;
-        console.log('✅ Injected video URL directly into formatted summary');
-      }
+      // Create a proper structured summary object for ClientPDFService
+      // that includes all the necessary data and videoUrl
+      const summaryObj = {
+        ...data.summary, // Include all original data
+        summary: formattedSummaryText, // Add formatted text as summary property
+        videoUrl: videoUrl, // Ensure video URL is included
+        caseId: data.summary.caseId || `CASE-${Date.now()}`,
+        reportDate: data.summary.reportDate || new Date().toISOString(),
+        location: data.location || 'Unknown Location'
+      };
+      
+      console.log('✅ Created summary object with video URL:', {
+        hasVideoUrl: !!summaryObj.videoUrl,
+        caseId: summaryObj.caseId,
+      });
       
       // Create the request object for PDF generation with the videoUrl
       // integrated at every possible level to ensure it makes it through
+      
+      // Get the user ID from Supabase session for PDF upload
+      let userId = null;
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        userId = sessionData?.session?.user?.id || null;
+        console.log('🔑 Got user ID for PDF upload:', userId ? `${userId.substring(0, 8)}...` : 'No user ID');
+      } catch (sessionError) {
+        console.warn('⚠️ Could not get user session for PDF:', sessionError);
+      }
+      
+      // Pass userId to enable Supabase PDF upload and dashboard registration
       const pdfPath = await ClientPDFService.generatePDFReport({
-        summary: formattedSummary,
+        summary: summaryObj, // Use the fixed summary object
         transcript: data.transcript,
         originalTranscript: data.originalTranscript || '',
         language: data.languageDetected,
@@ -67,6 +87,17 @@ async function generatePdfWithRetry(data: {
         includeSignature: true,
         includeTimestamps: true,
         includeFooter: true,
+      }, userId); // Pass userId here to enable Supabase upload
+      
+      // Check if we got a Supabase URL or a blob URL
+      const isSupabaseUrl = pdfPath.includes('supabase.co') || pdfPath.includes('supabase.in');
+      const isBlobUrl = pdfPath.startsWith('blob:');
+      
+      console.log('🔄 PDF Result Type:', {
+        isSupabaseUrl,
+        isBlobUrl,
+        pdfPath: pdfPath.substring(0, 50) + '...',
+        hasUserId: !!userId
       });
 
       return pdfPath;
@@ -325,13 +356,23 @@ export async function uploadRecording(audioBlob: Blob, location: string): Promis
 
     console.log('💾 Saved to Supabase with full transcript intelligence.');
 
-    // Handle the PDF URL returned directly from ClientPDFService
-    // pdfResult is now already a complete URL (object URL or direct download URL)
-    console.log('✅ PDF URL received:', pdfResult);
+    // Handle the PDF URL returned from ClientPDFService
+    console.log('✅ PDF URL received:', pdfResult.substring(0, 50) + '...');
     
-    // No need to get from Supabase storage since the PDF is returned directly
+    // Log whether we got a Supabase URL or blob URL
+    const isSupabaseUrl = pdfResult.includes('supabase.co') || pdfResult.includes('supabase.in');
+    const isBlobUrl = pdfResult.startsWith('blob:');
+    
+    console.log('📊 PDF Result Analysis:', {
+      isSupabaseUrl,
+      isBlobUrl,
+      hasUserId: !!userId, // Log if we had a userId which should have triggered Supabase upload
+      urlType: isSupabaseUrl ? 'Supabase Storage URL' : (isBlobUrl ? 'Local Blob URL' : 'Other URL')
+    });
+    
+    // Use the URL provided by ClientPDFService
     const finalUrl = pdfResult || '';
-    console.log('📄 Returning PDF URL:', finalUrl);
+    console.log('📄 Returning PDF URL:', finalUrl.substring(0, 50) + '...');
 
     // Return transcript and PDF report URL with enhanced fields for non-English support
     return {

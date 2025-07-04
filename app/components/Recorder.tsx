@@ -80,11 +80,11 @@ export default function Recorder() {
   
   // Reference to the same stop function triggered by the button
   const handleStopRecording = useCallback(() => {
-    console.log('[RecordGuard] Limit reached - triggering full stop recording flow');
-    if (recording) {
-      stopRecording(); // This will trigger the full recording flow including upload and transcription
-    }
-  }, [recording]); // Re-create when recording state changes
+    if (!mediaRecorder || mediaRecorder.state !== "recording") return;
+    console.log("[RecordGuard] Stopping recording due to time limit reached...");
+    mediaRecorder.stop(); // Will trigger onstop callback with full upload + Whisper flow
+    setRecording(false);
+  }, [mediaRecorder]); // Re-create when mediaRecorder changes
   
   // RecordGuard integration
   const recordGuard = useRecordGuard({
@@ -165,28 +165,13 @@ export default function Recorder() {
         facingMode: facingMode as "user" | "environment" 
       };
       
-      if (maxRecordingSeconds <= 120) { // 2 minutes or less (free/starter)
-        videoConstraints = {
-          facingMode: facingMode as "user" | "environment",
-          width: { ideal: 640 },
-          height: { ideal: 360 },
-          frameRate: { ideal: 15 }
-        };
-      } else if (maxRecordingSeconds <= 600) { // 10 minutes or less (pro/enterprise)
-        videoConstraints = {
-          facingMode: facingMode as "user" | "environment",
-          width: { ideal: 480 },
-          height: { ideal: 270 }, 
-          frameRate: { ideal: 10 }
-        };
-      } else { // 30 minutes (legal plan)
-        videoConstraints = {
-          facingMode: facingMode as "user" | "environment",
-          width: { ideal: 320 },
-          height: { ideal: 180 },
-          frameRate: { ideal: 8 }
-        };
-      }
+      // Use exact getUserMedia resolution from requirements
+      videoConstraints = {
+        facingMode: facingMode as "user" | "environment",
+        width: { ideal: 640 },
+        height: { ideal: 360 },
+        frameRate: { ideal: 15 }
+      };
       
       console.log(`Using video quality settings for ${recordGuard.userPlan} plan (${maxRecordingSeconds}s):`, videoConstraints);
       
@@ -270,18 +255,10 @@ export default function Recorder() {
       // Test for codec support first to avoid errors
       let options = {};
       
-      // Set bitrates based on recording duration limits
-      const maxRecDuration = recordGuard.maxDuration;
-      let videoBitrate = 200000; // 200 kbps default
-      let audioBitrate = 32000;  // 32 kbps default
-      
-      if (maxRecDuration > 600) { // 30 minutes (legal plan)
-        videoBitrate = 100000;   // Ultra low 100 kbps
-        audioBitrate = 24000;    // Lower audio quality
-      } else if (maxRecDuration > 120) { // 5-10 min (pro/enterprise)
-        videoBitrate = 150000;   // Very low 150 kbps
-        audioBitrate = 28000;    // Reduced audio quality
-      }
+      // Set bitrates to ensure we stay under 25MB file size
+      // Using exact values from requirements
+      const videoBitrate = 200000; // 200 kbps
+      const audioBitrate = 32000;  // 32 kbps
       
       // Try different codecs in order of preference
       if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')) {
@@ -395,7 +372,7 @@ export default function Recorder() {
   };
 
   const stopRecording = () => {
-    console.log('Stopping recording...');
+    console.log('Manual stop button pressed - stopping recording...');
     
     if (!recording || !mediaRecorder) {
       console.log('Nothing to stop, no active recording.');
@@ -408,14 +385,18 @@ export default function Recorder() {
       return;
     }
     
+    // Use the same approach as handleStopRecording to ensure the onstop callback is triggered
+    // This will ensure the full upload + Whisper + download flow executes properly
     mediaRecorder.stop();
     setRecording(false);
+    console.log('MediaRecorder stopped, onstop event should trigger now');
   };
 
   const retryCamera = async () => {
     cleanupStream();
     // Clear any previous errors
     setError('');
+    
     // Provide instructions for users to reset permissions
     toast((
       <div>

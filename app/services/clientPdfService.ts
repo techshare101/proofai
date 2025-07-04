@@ -80,19 +80,23 @@ export class ClientPDFService {
       includeSignature: true,
       includeTimestamps: true,
       includeFooter: true
-    }
+    },
+    userId?: string
   ): Promise<string> {
     const formattedSummary = formatSummary(summary);
 
+    // Include userId if available to enable Supabase storage upload
     const response = await fetch('/api/generate-pdf', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        summary,
+        structuredSummary: summary, // Renamed to match API expectation
         formattedSummary,
-        options
+        options,
+        userId,
+        uploadToSupabase: !!userId // Add explicit flag to request Supabase upload when userId is present
       }),
     });
 
@@ -117,6 +121,14 @@ export class ClientPDFService {
       // Fallback to previous behavior for backward compatibility
       try {
         const result = await response.json();
+        
+        // If we have a publicUrl from Supabase upload, return that
+        if (result.success && result.publicUrl) {
+          console.log('[ClientPDFService] PDF uploaded to Supabase:', result.publicUrl);
+          return result.publicUrl;
+        }
+        
+        // Fall back to the previous URL format if available
         const cleanUrl = result.url?.replace(/([^:])\/\{2,\}/g, '$1/');
         return cleanUrl;
       } catch (error) {
