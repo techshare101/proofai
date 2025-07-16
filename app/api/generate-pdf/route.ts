@@ -1,101 +1,197 @@
-export const dynamic = "force-dynamic"; // Disable static rendering
+console.log("[PDF-ROUTE] ACTIVE: this is the real route.ts");
 
-import { NextResponse } from 'next/server';
-import { generatePDF } from '@/utils/generatePDF';
-import { createClient } from "@supabase/supabase-js";
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { uploadPdfToSupabase, getSignedPdfUrl } from '../../utils/uploadPdfToSupabase';
+import { generatePDF } from '../../utils/generatePDF';
 
-// Initialize Supabase securely using env vars and proper options
-// This ensures no session is persisted when using service role key
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: { persistSession: false } // Important security practice
-  }
-);
-
-export async function POST(req: Request) {
+async function fetchWhisperDataFromDatabase(supabase, caseId: string) {
   try {
-    const body = await req.json();
-    console.log('[PDF API] Incoming request body:', body);
-
-    // Extract data from the body following the existing structure
-    const { structuredSummary } = body;
-    
-    if (!structuredSummary) {
-      console.error('[PDF API] Missing required fields:', { structuredSummary: !!structuredSummary });
-      return NextResponse.json(
-        { success: false, error: 'Missing required field: structuredSummary' },
-        { status: 400 }
-      );
-    }
-
-    // Simplified implementation that preserves Supabase functionality
-    const caseId = structuredSummary.caseId || `case-${Date.now()}`;
-    
+    console.log(`[WHISPER-FETCH] Attempting to fetch whisper data for caseId: ${caseId}`);
+    // Attempt transcripts table
     try {
-      // Generate the PDF using the new implementation
-      const pdfBytes = await generatePDF(structuredSummary);
-      
-      // If user requested Supabase upload, handle it
-      if (body.uploadToSupabase && pdfBytes) {
-        try {
-          const filename = `${caseId}-${Date.now()}.pdf`;
-          console.log('[PDF API] Uploading to Supabase as:', filename);
-          
-          const { error: uploadError } = await supabase.storage
-            .from('reports')
-            .upload(filename, pdfBytes, {
-              contentType: 'application/pdf',
-              upsert: true
-            });
-
-          if (!uploadError) {
-            // Get the public URL for the uploaded file
-            const { data: publicUrlData } = supabase.storage
-              .from('reports')
-              .getPublicUrl(filename);
-
-            const publicUrl = publicUrlData?.publicUrl;
-            if (publicUrl) {
-              console.log('[PDF API] ✅ PDF successfully uploaded:', publicUrl);
-              return NextResponse.json({
-                success: true, 
-                publicUrl,
-                metadata: {
-                  caseId,
-                  reportDate: new Date().toISOString(),
-                  location: structuredSummary.location || 'Unknown Location'
-                }
-              });
-            }
-          }
-        } catch (uploadErr) {
-          console.error('[PDF API] ❌ Supabase upload exception:', uploadErr);
-          // Continue to return the PDF directly
-        }
+      const { data } = await supabase
+        .from('transcripts')
+        .select('transcript')
+        .eq('case_id', caseId)
+        .single();
+      if (data?.transcript) {
+        console.log('[WHISPER-FETCH] Found transcript in transcripts table.');
+        return { transcript: data.transcript };
       }
+    } catch {}
+    // Attempt recordings table
+    try {
+      const { data } = await supabase
+        .from('recordings')
+        .select('transcript')
+        .eq('case_id', caseId)
+        .single();
+      if (data?.transcript) {
+        console.log('[WHISPER-FETCH] Found transcript in recordings table.');
+        return { transcript: data.transcript };
+      }
+    } catch {}
+    // Attempt raw_transcripts table
+    try {
+      const { data } = await supabase
+        .from('raw_transcripts')
+        .select('content')
+        .eq('case_id', caseId)
+        .single();
+      if (data?.content) {
+        console.log('[WHISPER-FETCH] Found transcript in raw_transcripts table.');
+        return { transcript: data.content };
+      }
+    } catch {}
 
-      // If we reach here, either no upload was requested or upload failed
-      console.log('[PDF API] Returning PDF as direct download');
-      return new NextResponse(pdfBytes, {
-        headers: {
-          'Content-Type': 'application/pdf',
-          'Content-Disposition': `attachment; filename=proofai-report-${caseId}.pdf`
-        }
-      });
-    } catch (err: any) {
-      console.error('[PDF API] Error during PDF generation:', err);
-      return NextResponse.json(
-        { success: false, error: err.message || 'Unknown server error' },
-        { status: 500 }
-      );
-    }
+    console.log('[WHISPER-FETCH] No transcript found in any table.');
+    return null;
   } catch (err) {
-    console.error('[PDF API] Error parsing request:', err);
-    return NextResponse.json(
-      { success: false, error: 'Invalid request format' },
-      { status: 400 }
+    console.error('[WHISPER-FETCH] Unexpected error:', err);
+    return null;
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    console.log('[PDF-GENERATION] Received PDF generation request');
+    let body: any;
+    try {
+      body = await req.json();
+    } catch (err) {
+      return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400 });
+    }
+
+    const structuredSummary = body.structuredSummary || body;
+
+    // Merge transcript fields from body
+    if (!structuredSummary.originalTranscript && body.originalTranscript) {
+      structuredSummary.originalTranscript = body.originalTranscript;
+    }
+    if (!structuredSummary.transcript && body.transcript) {
+      structuredSummary.transcript = body.transcript;
+    }
+    if (!structuredSummary.rawTranscript && body.rawTranscript) {
+      structuredSummary.rawTranscript = body.rawTranscript;
+    }
+
+    // Normalize transcript fields
+    body.transcript = structuredSummary.transcript || '';
+    body.originalTranscript =
+      structuredSummary.originalTranscript ||
+      structuredSummary.original_transcript ||
+      body.transcript ||
+      '';
+    body.rawTranscript =
+      structuredSummary.rawTranscript || structuredSummary.raw_transcript || body.transcript || '';
+    body.translatedTranscript =
+      structuredSummary.translatedTranscript || structuredSummary.translated_transcript || '';
+
+    // 📌 FIXED LOCATION PRIORITIZATION
+    body.location =
+      structuredSummary.address ||
+      structuredSummary.geocode?.address ||
+      structuredSummary.location ||
+      body.address ||
+      body.geocode?.address ||
+      body.location ||
+      'Unknown Location';
+    body.caseId =
+      structuredSummary.caseId ||
+      structuredSummary.case_id ||
+      body.caseId ||
+      `case-${Date.now()}`;
+
+    console.log('[PDF-ROUTE] Transcript fields before generation:', {
+      originalTranscriptLength: body.originalTranscript?.length || 0,
+      translatedTranscriptLength: body.translatedTranscript?.length || 0
+    });
+
+    // Handle Whisper override
+    if (body.whisper?.transcript || body.whisper?.text) {
+      const whisperText = body.whisper.transcript || body.whisper.text || '';
+      console.log('[PDF-WHISPER] Whisper text length:', whisperText.length);
+      if (whisperText && whisperText.trim().length > 0) {
+        body.originalTranscript = whisperText;
+        body.transcript = whisperText;
+        body.rawTranscript = whisperText;
+        console.log('[PDF-WHISPER] Overriding transcript fields with Whisper data.');
+      } else {
+        console.log('[PDF-WHISPER] Whisper present but empty, keeping existing transcripts.');
+      }
+    } else {
+      console.log('[PDF-WHISPER] No Whisper transcript present.');
+    }
+
+    // Consolidate data
+    const consolidatedData: any = {
+      ...body,
+      transcript:
+        body.transcript ||
+        structuredSummary.transcript ||
+        structuredSummary.originalTranscript ||
+        '',
+      originalTranscript:
+        body.originalTranscript ||
+        structuredSummary.originalTranscript ||
+        body.transcript ||
+        '',
+      rawTranscript:
+        body.rawTranscript || structuredSummary.rawTranscript || body.transcript || '',
+      translatedTranscript:
+        body.translatedTranscript || structuredSummary.translatedTranscript || ''
+    };
+
+    // Ensure underscore naming as well
+    consolidatedData.original_transcript = consolidatedData.originalTranscript;
+    consolidatedData.raw_transcript = consolidatedData.rawTranscript;
+    consolidatedData.translated_transcript = consolidatedData.translatedTranscript;
+
+    console.log('🧠 Consolidated data for PDF:', {
+      caseId: consolidatedData.caseId,
+      location: consolidatedData.location,
+      originalTranscriptLength: consolidatedData.originalTranscript?.length || 0,
+      translatedTranscriptLength: consolidatedData.translatedTranscript?.length || 0
+    });
+
+    // Generate the PDF
+    const pdfBytes = await generatePDF(consolidatedData);
+
+    // Upload to Supabase if userId is present
+    const userId = body.userId || structuredSummary.userId;
+    if (userId) {
+      try {
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
+        const supabaseKey =
+          process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY ||
+          process.env.SUPABASE_SERVICE_ROLE_KEY ||
+          process.env.SUPABASE_SERVICE_KEY ||
+          '';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+        const customFilename = `case-${consolidatedData.caseId}-${Date.now()}.pdf`;
+        const storagePath = await uploadPdfToSupabase(supabase, userId, pdfBlob, customFilename);
+        const signedUrl = await getSignedPdfUrl(supabase, storagePath, 3600 * 24);
+        return NextResponse.json({ success: true, publicUrl: signedUrl, storagePath });
+      } catch (err) {
+        console.error('[PDF-SUPABASE-UPLOAD-ERROR]', err);
+      }
+    }
+
+    // Fallback: return PDF directly
+    return new NextResponse(pdfBytes, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="proofai-case-${consolidatedData.caseId}.pdf"`
+      }
+    });
+  } catch (error: any) {
+    console.error('[PDF-GENERATION-ERROR]', error);
+    return new Response(
+      JSON.stringify({ error: 'Failed to generate PDF', message: error.message }),
+      { status: 500 }
     );
   }
 }
