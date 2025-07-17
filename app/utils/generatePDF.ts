@@ -4,7 +4,7 @@ import QRCode from 'qrcode';
 const margin = 50;
 const lineHeight = 14;
 
-// Helper: split long text into wrapped lines
+// Wrap text
 function splitTextIntoLines(text: string, maxCharsPerLine: number): string[] {
   if (!text) return [];
   const words = text.split(' ');
@@ -23,20 +23,20 @@ function splitTextIntoLines(text: string, maxCharsPerLine: number): string[] {
   return lines;
 }
 
-// Draw header section with underline
+// Section header with underline (green accent)
 function drawSectionHeader(page: PDFPage, text: string, x: number, y: number, size: number, font: any) {
   page.drawText(text, { x, y, size, font });
   const width = font.widthOfTextAtSize(text, size);
   page.drawLine({
     start: { x, y: y - 3 },
     end: { x: x + width, y: y - 3 },
-    thickness: 0.8,
-    color: rgb(0, 0, 0),
+    thickness: 1,
+    color: rgb(0, 0.6, 0.3), // green underline
   });
   return y - 24;
 }
 
-// Draw a transcript section with pagination
+// Transcript section
 function drawTranscriptSection(
   pdfDoc: PDFDocument,
   page: PDFPage,
@@ -62,7 +62,7 @@ function drawTranscriptSection(
       y: currentY,
       size: 10,
       font,
-      lineHeight,
+      color: rgb(0, 0, 0),
     });
     currentY -= lineHeight;
   }
@@ -70,7 +70,7 @@ function drawTranscriptSection(
   return { page: currentPage, y: currentY };
 }
 
-// Draw footer with page numbers and confidentiality
+// Footer
 function addFooter(page: PDFPage, pageNumber: number, totalPages: number, font: any) {
   const footerY = 30;
   page.drawLine({
@@ -95,10 +95,10 @@ function addFooter(page: PDFPage, pageNumber: number, totalPages: number, font: 
   });
 }
 
-// Draw signature area at bottom (safe ASCII characters only)
+// Signature area
 function drawSignatureArea(page: PDFPage, y: number, font: any, boldFont: any) {
   let currentY = y;
-  currentY -= 50; // spacing before signature
+  currentY -= 50;
 
   page.drawLine({
     start: { x: margin, y: currentY },
@@ -106,12 +106,9 @@ function drawSignatureArea(page: PDFPage, y: number, font: any, boldFont: any) {
     thickness: 1,
     color: rgb(0, 0, 0),
   });
-
   currentY -= 15;
   page.drawText('Authorized Signature', { x: margin, y: currentY, size: 10, font: boldFont });
-
   currentY -= 20;
-  // ✅ Plain hyphen to avoid encoding issues
   page.drawText('ProofAI System Auto-Signature', {
     x: margin,
     y: currentY,
@@ -123,15 +120,32 @@ function drawSignatureArea(page: PDFPage, y: number, font: any, boldFont: any) {
   return currentY - 30;
 }
 
-// Embed QR code
-async function embedQRCode(pdfDoc: PDFDocument, page: PDFPage, url: string, yOffset: number) {
+// QR code with green background
+async function embedQRCode(pdfDoc: PDFDocument, page: PDFPage, url: string, yOffset: number, boldFont: any) {
   const qrDataUrl = await QRCode.toDataURL(url, { margin: 0, scale: 4 });
   const qrImageBytes = await fetch(qrDataUrl).then((r) => r.arrayBuffer());
   const qrImage = await pdfDoc.embedPng(qrImageBytes);
   const qrSize = 120;
   const qrX = (page.getWidth() - qrSize) / 2;
-  const qrY = yOffset - qrSize - 10;
-  page.drawText('SCAN TO VIEW EVIDENCE', { x: qrX - 20, y: qrY + qrSize + 10, size: 12 });
+  const qrY = yOffset - qrSize - 30;
+
+  // Green bar behind QR section
+  page.drawRectangle({
+    x: 0,
+    y: qrY - 40,
+    width: page.getWidth(),
+    height: qrSize + 80,
+    color: rgb(0, 0.6, 0.3),
+  });
+
+  page.drawText('SCAN TO VIEW EVIDENCE', {
+    x: qrX - 20,
+    y: qrY + qrSize + 10,
+    size: 12,
+    font: boldFont,
+    color: rgb(1, 1, 1),
+  });
+
   page.drawImage(qrImage, { x: qrX, y: qrY, width: qrSize, height: qrSize });
 }
 
@@ -146,27 +160,56 @@ export async function generatePDF(inputData: any) {
   const caseId = inputData.caseId || 'Unknown';
   const location = inputData.location || 'Unknown Location';
   const now = new Date();
-  const dateTime = now.toLocaleString(); // date + time
+  const dateTime = now.toLocaleString();
 
-  // Header with location, case ID, and date-time
-  page.drawText(`LOCATION: ${location}`, { x: margin, y, size: 12, font: boldFont });
-  y -= 25;
-  page.drawText(`CASE REPORT`, { x: margin, y, size: 14, font: boldFont });
-  y -= 25;
-  page.drawText(`Case ID: ${caseId}`, { x: margin, y, size: 12, font });
-  y -= 15;
-  page.drawText(`Report Date: ${dateTime}`, { x: margin, y, size: 12, font });
-  y -= 25;
-  page.drawLine({ start: { x: margin, y }, end: { x: 562, y }, thickness: 1, color: rgb(0.7, 0.7, 0.7) });
+  // Main header
+  page.drawText(`CASE REPORT`, { x: margin, y, size: 16, font: boldFont });
   y -= 20;
+  page.drawText(`Location: ${location}`, { x: margin, y, size: 12, font });
+  y -= 30;
 
+  // DETAIL SUMMARY header block
+  page.drawRectangle({
+    x: margin,
+    y: y - 5,
+    width: page.getWidth() - margin * 2,
+    height: 20,
+    color: rgb(0, 0.6, 0.3),
+  });
+  page.drawText('DETAIL SUMMARY', {
+    x: margin + 5,
+    y: y,
+    size: 12,
+    font: boldFont,
+    color: rgb(1, 1, 1),
+  });
+  y -= 30;
+
+  // Metadata box
+  page.drawRectangle({
+    x: margin,
+    y: y - 85,
+    width: page.getWidth() - margin * 2,
+    height: 80,
+    borderWidth: 1,
+    borderColor: rgb(0.7, 0.7, 0.7),
+    color: rgb(1, 1, 1),
+  });
+  page.drawText(`Case ID: ${caseId}`, { x: margin + 5, y: y - 20, size: 10, font });
+  page.drawText(`Report Date: ${dateTime}`, { x: margin + 5, y: y - 35, size: 10, font });
+  page.drawText(`Location: ${location}`, { x: margin + 5, y: y - 50, size: 10, font });
+  page.drawText(`Language: ${inputData.language || 'NOT SPECIFIED'}`, {
+    x: margin + 5,
+    y: y - 65,
+    size: 10,
+    font,
+  });
+  y -= 100;
+
+  // ENGLISH TRANSLATION (FIXED: no duplicate header)
   let currentPage = page;
   let currentY = y;
-
   const translatedTranscript: string = inputData.translatedTranscript || '';
-  const originalTranscript: string = inputData.originalTranscript || inputData.transcript || '';
-
-  // ENGLISH TRANSLATION
   if (translatedTranscript.trim().length > 0) {
     const res = drawTranscriptSection(pdfDoc, currentPage, translatedTranscript, currentY, {
       font,
@@ -187,13 +230,13 @@ export async function generatePDF(inputData: any) {
   }
 
   currentY = Math.max(60, currentY - 20);
-
   if (currentY < 100) {
     currentPage = pdfDoc.addPage([612, 792]);
     currentY = 750;
   }
 
   // ORIGINAL TRANSCRIPT
+  const originalTranscript: string = inputData.originalTranscript || inputData.transcript || '';
   if (originalTranscript.trim().length > 0) {
     const res = drawTranscriptSection(pdfDoc, currentPage, originalTranscript, currentY, {
       font,
@@ -214,11 +257,9 @@ export async function generatePDF(inputData: any) {
     currentY -= 30;
   }
 
-  // Signature area
+  // Signature and QR
   currentY = drawSignatureArea(currentPage, currentY, font, boldFont);
-
-  // QR code
-  await embedQRCode(pdfDoc, currentPage, inputData.videoUrl || 'https://proof.ai', currentY);
+  await embedQRCode(pdfDoc, currentPage, inputData.videoUrl || 'https://proof.ai', currentY, boldFont);
 
   // Footer on all pages
   const pages = pdfDoc.getPages();
