@@ -122,6 +122,7 @@ function drawSignatureArea(page: PDFPage, y: number, font: any, boldFont: any) {
 
 // QR code with green background
 async function embedQRCode(pdfDoc: PDFDocument, page: PDFPage, url: string, yOffset: number, boldFont: any) {
+  console.log('[PDF] Embedding QR code with URL:', url);
   const qrDataUrl = await QRCode.toDataURL(url, { margin: 0, scale: 4 });
   const qrImageBytes = await fetch(qrDataUrl).then((r) => r.arrayBuffer());
   const qrImage = await pdfDoc.embedPng(qrImageBytes);
@@ -257,9 +258,22 @@ export async function generatePDF(inputData: any) {
     currentY -= 30;
   }
 
+  // Ensure there's enough room for signature & QR (e.g., 200px)
+  if (currentY < 250) {
+    console.log('[PDF] Adding new page for signature and QR code');
+    currentPage = pdfDoc.addPage([612, 792]);
+    currentY = 750; // Reset Y position near top of new page
+  }
+  
   // Signature and QR
   currentY = drawSignatureArea(currentPage, currentY, font, boldFont);
-  await embedQRCode(pdfDoc, currentPage, inputData.videoUrl || 'https://proof.ai', currentY, boldFont);
+  
+  // Get the video URL with fallbacks
+  const qrUrl = inputData.videoUrl || 
+               (inputData.structuredSummary?.videoUrl) || 
+               `https://proof.ai/evidence/case/${inputData.caseId || 'unknown'}`;
+  console.log('[PDF] Generating QR code with URL:', qrUrl);
+  await embedQRCode(pdfDoc, currentPage, qrUrl, currentY, boldFont);
 
   // Footer on all pages
   const pages = pdfDoc.getPages();
