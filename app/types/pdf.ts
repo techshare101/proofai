@@ -18,28 +18,63 @@ export interface ReportRelevance {
 }
 
 export interface StructuredSummary {
+  // Core identification
   caseId: string;
-  reportDate: string;
-  summary: string;
+  case_id?: string; // Alternative case ID field
+  summary?: string;
+  
+  // Transcript data
+  transcript?: string;
+  originalTranscript?: string;
+  translatedTranscript?: string;
+  rawTranscript?: string;
+  transcriptText?: string; // Fallback transcript field
+  
+  // Location data
+  location?: string;
+  address?: string; // Alternative location field
+  geocodedAddress?: string; // Geocoded address from coordinates
+  lat?: number; // Latitude for location
+  lng?: number; // Longitude for location
+  
+  // Timestamps
+  timestamp?: string;
+  reportDate?: string;
+  
+  // Media
+  videoUrl?: string; // URL to related video evidence
+  publicUrl?: string; // Public URL for verification QR code
+  
+  // Language
+  language?: string;
+  detectedLanguage?: string;
+  
+  // Additional metadata
   actionItems?: string[];
   keyEvents?: string[];
-  detectedLanguage?: string;
-  reportRelevance?: ReportRelevance;
-  witnessInfo?: WitnessInfo;
-  translatedTranscript?: string;
-  originalTranscript?: string;
-  language?: string;
-  riskLevel?: 'Low' | 'Moderate' | 'High' | 'Critical';
   incidentDetails?: string;
-  location?: string;
   environmentalFactors?: string;
   participants?: string[];
   timestampedLog?: string[];
-  transcript?: string;
-  videoUrl?: string; // URL to related video evidence
-  publicUrl?: string; // Public URL for verification QR code
-  lat?: number; // Latitude for location
-  lng?: number; // Longitude for location
+  
+  // Risk and relevance
+  riskLevel?: 'Low' | 'Moderate' | 'High' | 'Critical';
+  reportRelevance?: ReportRelevance;
+  
+  // Witness information
+  witnessInfo?: WitnessInfo;
+  
+  // User information
+  userId?: string;
+  
+  // Additional fields from API
+  whisper?: {
+    transcript?: string;
+    text?: string;
+  };
+  
+  // For backward compatibility
+  [key: string]: any; // Allow additional properties
 }
 
 export interface PdfGenerationOptions {

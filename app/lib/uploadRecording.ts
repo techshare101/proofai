@@ -34,12 +34,17 @@ async function generatePdfWithRetry(
         await new Promise((resolve) => setTimeout(resolve, retryDelay));
       }
 
-      const videoUrl =
-        data.summary && typeof data.summary === 'object' && data.summary.videoUrl
-          ? data.summary.videoUrl
-          : 'https://proof.ai/evidence';
-
-      console.log('🔗 USING VIDEO URL FOR PDF:', videoUrl);
+      let videoUrl = 'https://proof.ai/evidence';
+      
+      if (data.summary && typeof data.summary === 'object' && data.summary.videoUrl) {
+        videoUrl = data.summary.videoUrl;
+        console.log('🔗 Using provided video URL for PDF:', videoUrl);
+      } else if (data.summary?.caseId) {
+        videoUrl = `https://proof.ai/evidence/case/${data.summary.caseId}`;
+        console.warn('⚠️ No video URL found in summary, using case-specific fallback URL:', videoUrl);
+      } else {
+        console.warn('⚠️ No video URL or case ID found, using default URL:', videoUrl);
+      }
 
       const formattedSummaryText = formatSummary(data.summary);
 
@@ -266,17 +271,36 @@ export async function uploadRecording(audioBlob: Blob, location: string): Promis
     }
 
     console.log('📹 Creating signed URL for video recording...');
-    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-      .from(bucketName)
-      .createSignedUrl(storageData.path, 60 * 60 * 24 * 7);
+    let videoUrl = 'https://proof.ai/evidence';
+    
+    try {
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from(bucketName)
+        .createSignedUrl(storageData.path, 60 * 60 * 24 * 7); // 7 days expiration
 
-    if (signedUrlError) {
-      console.error('❌ Failed to generate signed video URL:', signedUrlError);
-      summary.videoUrl = 'https://proof.ai/evidence';
-    } else {
-      summary.videoUrl = signedUrlData.signedUrl;
-      console.log('✅ Generated signed video URL:', summary.videoUrl);
+      if (signedUrlError) {
+        console.error('❌ Failed to generate signed video URL:', signedUrlError);
+        // Fallback to public URL if signed URL fails
+        const { data: publicUrl } = supabase.storage
+          .from(bucketName)
+          .getPublicUrl(storageData.path);
+        
+        if (publicUrl) {
+          videoUrl = publicUrl.publicUrl;
+          console.log('✅ Using public URL for video:', videoUrl);
+        } else {
+          console.warn('⚠️ Could not generate any video URL, using default');
+        }
+      } else {
+        videoUrl = signedUrlData.signedUrl;
+        console.log('✅ Generated signed video URL:', videoUrl);
+      }
+    } catch (err) {
+      console.error('❌ Error generating video URL:', err);
     }
+    
+    // Store the video URL in the summary
+    summary.videoUrl = videoUrl;
 
     // ✅ Use geocoded location from summary if available
     const pdfResult = await generatePdfWithRetry({
@@ -287,28 +311,42 @@ export async function uploadRecording(audioBlob: Blob, location: string): Promis
       location: summary.location || location || 'Unknown Location',
     });
 
+    // 🚀 Build the payload with video URL in record_url
     const payload = {
       title: `Proof Report – ${new Date().toLocaleString()}`,
-      file_url: signedUrl,
-      summary,
-      original_transcript: transcript,
-      translated_transcript: translatedTranscript,
-      language_detected: languageDetected,
-      location: summary.location || location,
-      created_at: new Date().toISOString(),
-      user_id: userId,
+      file_url: pdfResult,                  // PDF public URL
+      pdf_url: pdfResult,                   // also store as pdf_url for clarity
+      record_url: summary.videoUrl || null, // Store video URL in record_url
+      user_id: userId,                      // matches user_id column
+      summary: summary?.summary || 'No summary provided',
+      transcript: rawTranscript || transcript || '',
+      translated_transcript: translatedTranscript || '',
+      original_transcript: transcript || '',
+      language_detected: languageDetected || '',
+      location: summary.location || location || 'Unknown Location',
+      created_at: new Date().toISOString()
     };
 
-    console.log('🧾 Payload to Supabase:', payload);
+    console.log('🧾 Payload to Supabase:', JSON.stringify(payload, null, 2));
 
-    const { error: dbError } = await supabase.from('reports').insert(payload).select();
-    if (dbError) {
-      console.error('❌ Supabase insert error:', dbError.message);
-      const err = new Error('Failed to save recording to database') as UploadError;
+    // 🔥 Insert the payload into Supabase reports table
+    const { data: insertedData, error: dbError } = await supabase
+      .from('reports')
+      .insert(payload)
+      .select()
+      .single();
+
+    if (dbError || !insertedData) {
+      console.error('❌ Supabase insert error:', dbError?.message || 'No data returned');
+      const err = new Error(dbError?.message || 'Failed to save report to database') as UploadError;
       err.stage = 'database';
-      err.details = dbError;
+      err.details = dbError || 'No data returned from insert';
       throw err;
     }
+
+    console.log('✅ Report saved to Supabase with ID:', insertedData.id);
+    console.log('💾 Saved to Supabase with full transcript intelligence.');
+    console.log('✅ PDF URL received:', pdfResult.substring(0, 50) + '...');
 
     console.log('💾 Saved to Supabase with full transcript intelligence.');
     console.log('✅ PDF URL received:', pdfResult.substring(0, 50) + '...');

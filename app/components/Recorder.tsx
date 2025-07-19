@@ -7,7 +7,7 @@ import { uploadRecording } from '@/lib/uploadRecording';
 import { useAuth } from '../contexts/AuthContext';
 import { useRecorder } from '../hooks/useRecorder';
 import { toast } from 'react-hot-toast';
-import { formatRecordingTime } from '../../lib/recordingLimits';
+import { formatRecordingTime, getMaxDurationForPlan } from '../../lib/recordingLimits';
 import { useRecordGuard } from '../../hooks/useRecordGuard';
 import RecorderPlanDebug from './RecorderPlanDebug';
 
@@ -78,6 +78,9 @@ export default function Recorder() {
   // Debug plan override for testing
   const [debugPlan, setDebugPlan] = useState<string>('');
   
+  // Get max recording time based on user's plan
+  const MAX_RECORD_TIME = getMaxDurationForPlan(debugPlan || session?.user?.user_metadata?.plan || 'free');
+  
   // Reference to the same stop function triggered by the button
   const handleStopRecording = useCallback(() => {
     if (!mediaRecorder || mediaRecorder.state !== "recording") return;
@@ -85,6 +88,19 @@ export default function Recorder() {
     mediaRecorder.stop(); // Will trigger onstop callback with full upload + Whisper flow
     setRecording(false);
   }, [mediaRecorder]); // Re-create when mediaRecorder changes
+  
+  // Automatic recording stop based on MAX_RECORD_TIME
+  useEffect(() => {
+    if (!recording || !mediaRecorder) return;
+    
+    console.log(`Setting auto-stop timer for ${MAX_RECORD_TIME} seconds`);
+    const timer = setTimeout(() => {
+      console.log(`Auto-stop timer triggered after ${MAX_RECORD_TIME} seconds`);
+      stopRecording(); // Automatically trigger stop
+    }, MAX_RECORD_TIME * 1000); // Convert to ms
+    
+    return () => clearTimeout(timer); // Clean up the timeout
+  }, [recording, mediaRecorder, MAX_RECORD_TIME]); // Re-run when recording state changes
   
   // RecordGuard integration
   const recordGuard = useRecordGuard({
@@ -383,6 +399,21 @@ export default function Recorder() {
     if (mediaRecorder.state !== 'recording') {
       console.warn("MediaRecorder not in recording state. Current state:", mediaRecorder.state);
       return;
+    }
+    
+    // Check if recording was too short (less than 5 seconds)
+    if (recordingTime < 5) {
+      toast.error("Recording was too short. Please record at least 5 seconds.", {
+        duration: 4000,
+        style: {
+          background: '#FFE1E1',
+          color: '#D00000',
+          padding: '16px',
+          fontWeight: 'bold',
+        },
+        icon: '⚠️',
+      });
+      return; // Prevent stopping and keep recording
     }
     
     // Use the same approach as handleStopRecording to ensure the onstop callback is triggered

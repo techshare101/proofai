@@ -76,21 +76,91 @@ export async function POST(req: Request) {
     console.log("🔄 Calling OpenAI Whisper API...");
     console.log("🔄 Request to OpenAI with file size:", file.size);
     
-    // Call OpenAI API
+    // Call OpenAI API with enhanced error handling
     let openaiRes;
     try {
-      openaiRes = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      const apiUrl = "https://api.openai.com/v1/audio/transcriptions";
+      const requestOptions = {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          "Authorization": `Bearer ${apiKey}`,
         },
         body: form,
+      };
+
+      console.log("🔄 Calling OpenAI Whisper API...");
+      console.log(`🔗 Endpoint: ${apiUrl}`);
+      console.log(`🔑 API Key: ${apiKey ? 'Present' : 'MISSING'}`);
+      
+      // Make the API call with a timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      openaiRes = await fetch(apiUrl, {
+        ...requestOptions,
+        signal: controller.signal,
       });
       
+      clearTimeout(timeoutId);
+      
       console.log(`🔄 OpenAI response status: ${openaiRes.status} ${openaiRes.statusText}`);
+      
+      // Log response headers for debugging
+      console.log('📋 Response headers:');
+      openaiRes.headers.forEach((value, key) => {
+        console.log(`  ${key}: ${value}`);
+      });
+      
+      if (!openaiRes.ok) {
+        const errorText = await openaiRes.text();
+        console.error('❌ OpenAI API Error Response:', errorText);
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          errorData = { error: { message: errorText } };
+        }
+        return NextResponse.json(
+          { 
+            error: 'OpenAI API request failed',
+            status: openaiRes.status,
+            statusText: openaiRes.statusText,
+            details: errorData
+          }, 
+          { status: 502 }
+        );
+      }
     } catch (openaiError) {
       console.error("❌ Error calling OpenAI API:", openaiError);
-      return NextResponse.json({ error: `OpenAI API error: ${openaiError.message}` }, { status: 500 });
+      
+      // Enhanced error handling for different error types
+      let errorMessage = 'Unknown error occurred';
+      let statusCode = 500;
+      
+      if (openaiError.name === 'AbortError') {
+        errorMessage = 'Request to OpenAI API timed out after 30 seconds';
+        statusCode = 504; // Gateway Timeout
+      } else if (openaiError.code === 'ECONNREFUSED') {
+        errorMessage = 'Connection to OpenAI API was refused. Please check your network connection and proxy settings.';
+        statusCode = 502; // Bad Gateway
+      } else if (openaiError.code === 'ENOTFOUND') {
+        errorMessage = 'Could not resolve OpenAI API hostname. Please check your DNS settings and network connection.';
+        statusCode = 502;
+      } else if (openaiError.code === 'ECONNRESET') {
+        errorMessage = 'Connection to OpenAI API was reset. This could be due to network issues or server problems.';
+        statusCode = 502;
+      } else {
+        errorMessage = `OpenAI API error: ${openaiError.message}`;
+      }
+      
+      return NextResponse.json(
+        { 
+          error: errorMessage,
+          code: openaiError.code,
+          stack: process.env.NODE_ENV === 'development' ? openaiError.stack : undefined 
+        }, 
+        { status: statusCode }
+      );
     }
 
     const result = await openaiRes.json();
@@ -115,11 +185,47 @@ export async function POST(req: Request) {
       text: rawText,
       transcript: rawText, // Ensure transcript field always exists
       rawTranscript: rawText, // Add explicit rawTranscript field
+      originalTranscript: rawText, // Add originalTranscript field for PDF generation
       detected_language: result.language || detectedLang,
       language: result.language || detectedLang, // Add language field for consistency
       supported_language: detectedLang,
       is_translated: false, // Flag to indicate if this is a translated transcript
     };
+    
+    // Ensure transcript is also injected into any summary object if present
+    if (result.summary || formData.get('summary')) {
+      console.log('📝 Injecting transcript into summary object...');
+      // Get existing summary from either the result or form data
+      const summary = result.summary || JSON.parse(formData.get('summary') as string || '{}');
+      
+      // Inject transcript fields into summary object
+      enhancedResult.summary = {
+        ...summary,
+        transcript: rawText,
+        rawTranscript: rawText,
+        originalTranscript: rawText
+      };
+      
+      console.log('✅ Transcript injected into summary fields');
+    }
+    
+    // Also ensure transcript is injected into structuredSummary if present
+    if (result.structuredSummary || formData.get('structuredSummary')) {
+      console.log('📝 Injecting transcript into structuredSummary object...');
+      // Get existing structuredSummary
+      const structuredSummary = result.structuredSummary || 
+        JSON.parse(formData.get('structuredSummary') as string || '{}');
+      
+      // Inject transcript fields into structuredSummary object
+      enhancedResult.structuredSummary = {
+        ...structuredSummary,
+        transcript: rawText,
+        rawTranscript: rawText,
+        originalTranscript: rawText
+      };
+      
+      console.log('✅ Transcript injected into structuredSummary fields');
+    }
     
     // Add detailed logging about transcript
     console.log(`🌐 Language details:`, {

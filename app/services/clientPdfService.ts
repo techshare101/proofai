@@ -1,4 +1,3 @@
-import { base64ToBlob } from '../utils/base64';
 import { StructuredSummary } from '../types/pdf';
 
 export interface PdfGenerationOptions {
@@ -83,22 +82,79 @@ export class ClientPDFService {
     },
     userId?: string
   ): Promise<string> {
-    const formattedSummary = formatSummary(summary);
+    let response;
+    try {
+      console.log('📊 PDF Generation Request - Input Summary:', {
+        caseId: summary?.caseId || 'Missing',
+        hasVideoUrl: !!summary?.videoUrl,
+        videoUrlLength: summary?.videoUrl?.length || 0,
+        summaryLength: typeof summary?.summary === 'string' ? summary.summary.length : 'Not a string',
+        userId: userId ? `${userId.substring(0,8)}...` : 'No user ID provided'
+      });
+      
+      const formattedSummary = formatSummary(summary);
 
-    // Include userId if available to enable Supabase storage upload
-    const response = await fetch('/api/generate-pdf', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        structuredSummary: summary, // Renamed to match API expectation
-        formattedSummary,
-        options,
-        userId,
-        uploadToSupabase: !!userId // Add explicit flag to request Supabase upload when userId is present
-      }),
-    });
+      // Make sure we have a valid videoUrl
+      if (!summary.videoUrl) {
+        console.warn('⚠️ No videoUrl provided in summary, using default URL');
+        summary.videoUrl = `https://proofai.app/view/${summary.caseId || 'unknown'}`;
+      } else {
+        console.log('✅ Using provided videoUrl:', summary.videoUrl);
+      }
+      
+      // Include userId if available to enable Supabase storage upload
+      console.log('🌐 Sending PDF generation request to API');
+      // Get transcript values with fallbacks
+      const transcript = summary.transcript || '';
+      const originalTranscript = summary.originalTranscript || transcript;
+      const rawTranscript = summary.rawTranscript || originalTranscript;
+      const translatedTranscript = summary.translatedTranscript || summary.summary || '';
+      
+      console.log('📝 Transcript data for PDF:', {
+        transcriptLength: transcript.length,
+        originalTranscriptLength: originalTranscript.length,
+        rawTranscriptLength: rawTranscript.length,
+        translatedTranscriptLength: translatedTranscript.length
+      });
+
+      response = await fetch('/api/generate-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          // Top-level transcript fields (critical for backward compatibility)
+          transcript,
+          originalTranscript,
+          rawTranscript,
+          translatedTranscript,
+          
+          // Structured summary with all transcript fields
+          structuredSummary: {
+            ...summary,
+            // Ensure all transcript fields are included in the summary
+            transcript,
+            originalTranscript,
+            rawTranscript,
+            translatedTranscript,
+            summary: formattedSummary, // Use the formatted summary
+            // Ensure videoUrl is included in the structured summary
+            videoUrl: summary.videoUrl,
+          },
+          
+          // Other required fields
+          formattedSummary,
+          options,
+          userId,
+          uploadToSupabase: !!userId,
+          videoUrl: summary.videoUrl,
+          caseId: summary.caseId,
+        }),
+      });
+    } catch (fetchError) {
+      console.error('❌ Error making PDF API request:', fetchError);
+      throw new Error(`Failed to connect to PDF generation service: ${fetchError.message}`);
+    }
 
     if (!response.ok) {
       const text = await response.text();

@@ -45,17 +45,50 @@ export class PDFService {
         }
       }
 
-      // Create the PDF generation request
-      // Note: PdfRequest expects 'content' property which we'll set to summary.summary
+      // Create a properly formatted request for generatePDF
+      // Ensure all required fields are included with proper fallbacks
       const request = {
-        content: summary.summary || '',  // Required by PdfRequest interface
-        caseId: summary.caseId,
-        structuredSummary: summary,
+        // Core fields
+        caseId: summary.caseId || `case-${Date.now()}`,
+        location: summary.location || 'Unknown Location',
+        address: summary.address || summary.location,
+        
+        // Transcript fields with proper fallbacks
+        originalTranscript: summary.originalTranscript || summary.transcript || summary.summary || '',
+        transcript: summary.transcript || summary.originalTranscript || summary.summary || '',
+        rawTranscript: summary.rawTranscript || summary.originalTranscript || summary.transcript || summary.summary || '',
+        translatedTranscript: summary.translatedTranscript || '',
+        
+        // Additional metadata
+        timestamp: summary.timestamp || new Date().toISOString(),
+        videoUrl: summary.videoUrl || '',
+        language: summary.language || 'en',
+        
+        // Include the original structured summary for backward compatibility
+        structuredSummary: {
+          ...summary,
+          // Ensure these fields are included in the nested structure too
+          caseId: summary.caseId || `case-${Date.now()}`,
+          location: summary.location || 'Unknown Location',
+          address: summary.address || summary.location,
+          originalTranscript: summary.originalTranscript || summary.transcript || summary.summary || '',
+          transcript: summary.transcript || summary.originalTranscript || summary.summary || '',
+          rawTranscript: summary.rawTranscript || summary.originalTranscript || summary.transcript || summary.summary || '',
+          translatedTranscript: summary.translatedTranscript || ''
+        },
+        
+        // Include options
         options: options
       };
 
-      // Log the location being sent to PDF generator
-      console.log(`[PDF API] 🌎 Location being sent to PDF generator: ${summary.location || 'Not available'}`);
+      // Log the data being sent to PDF generator
+      console.log(`[PDF API] 📝 Data being sent to PDF generator:`, {
+        caseId: request.caseId,
+        location: request.location,
+        transcriptLength: request.transcript?.length || 0,
+        originalTranscriptLength: request.originalTranscript?.length || 0,
+        translatedTranscriptLength: request.translatedTranscript?.length || 0
+      });
       
       // Generate the PDF using the utility
       const pdfBuffer = await generatePDF(request);
