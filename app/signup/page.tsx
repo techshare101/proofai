@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import supabase from '../lib/supabase';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -13,9 +13,24 @@ export default function SignUpPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const supabase = createClientComponentClient();
+
+  // Check if user is already logged in
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        // Redirect to pricing page instead of dashboard
+        // The middleware will handle further redirection based on subscription status
+        router.replace('/pricing');
+      }
+    };
+    checkUser();
+  }, [router, supabase.auth]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     
     // Validate passwords match
     if (password !== confirmPassword) {
@@ -32,7 +47,12 @@ export default function SignUpPage() {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`,
+          // Redirect to pricing page after email confirmation
+          emailRedirectTo: `${window.location.origin}/pricing`,
+          data: {
+            // Add any additional user metadata here
+            signup_complete: false
+          }
         },
       });
 
@@ -42,11 +62,12 @@ export default function SignUpPage() {
       }
 
       if (data?.user) {
-        setSuccess('Success! Check your email for the confirmation link.');
-        // Clear form
+        setSuccess('✅ Signup successful! Please check your email to confirm your account. After confirming, you\'ll be able to choose a plan.');
+        // Clear form on success
         setEmail('');
         setPassword('');
         setConfirmPassword('');
+        // Don't redirect - let the user read the success message
       }
     } catch (err: any) {
       console.error('Signup error:', err);
@@ -143,7 +164,14 @@ export default function SignUpPage() {
             
             <div className="text-sm text-center">
               Already have an account?{' '}
-              <Link href="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+              <Link
+                href="/login"
+                className="font-medium text-indigo-600 hover:text-indigo-500"
+                onClick={(e) => {
+                  e.preventDefault();
+                  router.push('/login');
+                }}
+              >
                 Sign in
               </Link>
             </div>

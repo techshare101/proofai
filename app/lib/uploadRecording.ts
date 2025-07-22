@@ -5,6 +5,7 @@ import { GPTService } from '../services/gptService';
 import supabase from './supabase';
 import { ClientPDFService } from '../services/clientPdfService';
 import { formatSummary } from '../utils/formatSummary';
+import { canUserRecord, updateUsage } from '@/lib/stripe/plans';
 
 interface UploadError extends Error {
   stage?: 'auth' | 'blob' | 'storage' | 'url' | 'database' | 'pdf';
@@ -126,8 +127,16 @@ interface UploadResult {
 export async function uploadRecording(audioBlob: Blob, location: string): Promise<UploadResult> {
   console.group('📹 Upload Recording Process');
 
+  // Hoist all variables at the top
   let filename = '';
   let recordingDuration = 0;
+  let transcript = '';
+  let rawTranscript = '';
+  let detectedLanguage = '';
+  let language = '';
+  let translatedTranscript = '';
+  let languageDetected = '';
+  let summary: any = null;
 
   try {
     console.log('🔍 Validating recording blob...');
@@ -207,31 +216,49 @@ export async function uploadRecording(audioBlob: Blob, location: string): Promis
     const signedUrl = urlData.signedUrl;
     console.log('✅ Signed URL generated:', signedUrl);
 
+    // Check if user can record based on their plan
+    const { canProceed, error: planError } = await canUserRecord(userId, recordingDuration);
+    
+    if (!canProceed) {
+      console.error('❌ Plan validation failed:', planError);
+      throw new Error(planError || 'Your current plan does not allow this recording.');
+    }
+    
+    console.log('✅ Plan validation passed');
+
     const transcriptionService = await TranscriptionService.getInstance();
     console.log('🎙️ Starting transcription using signed URL instead of blob to bypass size limits');
-    const transcriptionResult = await transcriptionService.transcribe(signedUrl);
-    const transcript = transcriptionResult.text || '';
-    const rawTranscript =
-      transcriptionResult.rawTranscript || transcriptionResult.transcript || transcript;
-    const detectedLanguage = transcriptionResult.detectedLanguage || transcriptionResult.language || '';
-    const language = transcriptionResult.language || detectedLanguage;
+    
+    try {
+      const transcriptionResult = await transcriptionService.transcribe(signedUrl);
+      transcript = transcriptionResult.text || '';
+      rawTranscript =
+        transcriptionResult.rawTranscript || transcriptionResult.transcript || '';
+      detectedLanguage = transcriptionResult.detectedLanguage || transcriptionResult.language || '';
+      language = transcriptionResult.language || detectedLanguage;
 
-    console.log('🎙️ Whisper Transcript:', {
-      transcriptLength: transcript.length,
-      rawTranscriptLength: rawTranscript.length,
-      language: language || 'unknown',
-      detectedLanguage: detectedLanguage || 'unknown',
-    });
+      // Update usage after successful transcription
+      await updateUsage(userId, recordingDuration);
 
-    const languageDetected = await GPTService.detectLanguageWithGPT(transcript);
-    console.log('🌐 Language Detected:', languageDetected);
+      console.log('🎙️ Whisper Transcript:', {
+        transcriptLength: transcript.length,
+        rawTranscriptLength: rawTranscript.length,
+        language: language || 'unknown',
+        detectedLanguage: detectedLanguage || 'unknown',
+      });
 
-    const translatedTranscript =
-      languageDetected === 'en'
+      languageDetected = await GPTService.detectLanguageWithGPT(transcript);
+      console.log('🌐 Language Detected:', languageDetected);
+
+      translatedTranscript = languageDetected === 'en'
         ? transcript
         : await GPTService.translateTranscriptWithGPT(transcript, 'English');
 
-    console.log('🌐 Translated Transcript:', translatedTranscript);
+      console.log('🌐 Translated Transcript:', translatedTranscript);
+    } catch (error) {
+      console.error('❌ Transcription failed:', error);
+      throw error; // Re-throw to be caught by the outer try-catch
+    }
 
     const summary = await GPTService.generateLegalSummary(translatedTranscript);
     console.log('📝 Summary generated');
@@ -347,6 +374,46 @@ export async function uploadRecording(audioBlob: Blob, location: string): Promis
     console.log('✅ Report saved to Supabase with ID:', insertedData.id);
     console.log('💾 Saved to Supabase with full transcript intelligence.');
     console.log('✅ PDF URL received:', pdfResult.substring(0, 50) + '...');
+
+    // 📊 Log usage silently (non-blocking)
+    if (recordingDuration > 0) {
+      console.log('📊 Logging usage:', { duration: Math.ceil(recordingDuration) });
+      supabase.from('usage').insert({
+        user_id: userId,
+        duration_seconds: Math.ceil(recordingDuration),
+      })
+      .then(({ error }) => {
+        if (error) {
+          console.error('⚠️ Failed to log usage:', error);
+        } else {
+          console.log('✅ Usage logged successfully');
+        }
+        return null;
+      })
+      .catch((err) => {
+        console.error('Error logging usage:', err);
+      });
+    }
+
+    // 📋 Fetch plan for debugging/logging (non-blocking)
+    const fetchPlanInfo = async () => {
+      try {
+        const { data: planRow } = await supabase
+          .from('user_plans')
+          .select('plan, whisper_minutes_used, whisper_minutes_limit')
+          .eq('user_id', userId)
+          .single();
+          
+        console.log('📋 Current plan:', planRow?.plan || 'starter', {
+          used: planRow?.whisper_minutes_used,
+          limit: planRow?.whisper_minutes_limit,
+        });
+      } catch (err) {
+        console.warn('⚠️ Could not fetch plan info:', err);
+      }
+    };
+    
+    fetchPlanInfo().catch(console.error);
 
     console.log('💾 Saved to Supabase with full transcript intelligence.');
     console.log('✅ PDF URL received:', pdfResult.substring(0, 50) + '...');

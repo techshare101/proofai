@@ -20,7 +20,7 @@ const nextConfig = {
       headers: [
         {
           key: 'Content-Security-Policy',
-          value: "default-src 'self' https://*.supabase.co https://*.opencagedata.com https://generativelanguage.googleapis.com https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co https://*.opencagedata.com https://generativelanguage.googleapis.com https://cdn.jsdelivr.net https://api.openai.com; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; media-src 'self' blob: https://d4qgj78fzsl5j.cloudfront.net; img-src 'self' data: blob:;"
+          value: "default-src 'self' https://*.supabase.co https://*.opencagedata.com https://generativelanguage.googleapis.com https://cdn.jsdelivr.net https://js.stripe.com; connect-src 'self' https://*.supabase.co https://*.opencagedata.com https://generativelanguage.googleapis.com https://cdn.jsdelivr.net https://api.openai.com https://api.stripe.com; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net https://js.stripe.com; script-src-elem 'self' 'unsafe-inline' https://js.stripe.com; style-src 'self' 'unsafe-inline' https://js.stripe.com; media-src 'self' blob: https://d4qgj78fzsl5j.cloudfront.net; img-src 'self' data: blob: https://*.stripe.com; frame-src 'self' https://js.stripe.com https://hooks.stripe.com;"
         }
       ]
     }
@@ -65,6 +65,8 @@ const nextConfig = {
       test: /onnxruntime_binding\.node$/,
       use: 'null-loader',
     });
+
+    // Handle CSS files with built-in Next.js CSS handling
 
     return config;
   },

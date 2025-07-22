@@ -95,58 +95,32 @@ export default function Hero() {
           </div>
           
           <div className="hidden md:block md:flex-1 md:ml-8 mt-8 md:mt-0">
-            <motion.div 
-              className="relative w-full h-64"
-              animate={pulseAnimation}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
-            >
+            <div className="relative w-full h-64">
               <Image
                 src="/hero-illustration.svg"
-                alt="ProofAI Documentation Illustration"
-                fill
-                className="object-contain"
+                alt="Secure video evidence illustration"
+                width={500}
+                height={375}
+                className="w-full h-full object-contain"
                 priority
-                onError={(e) => {
-                  // Fallback for when image doesn't exist
-                  const target = e.target as HTMLImageElement;
-                  target.onerror = null;
-                  target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgdmlld0JveD0iMCAwIDQwMCAzMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSIzMDAiIGZpbGw9IiNmOGY5ZmEiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9InN5c3RlbS11aSwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyNCIgZmlsbD0iIzZiN2VkNiI+UHJvdmlkZWQgaWxsdXN0cmF0aW9uPC90ZXh0Pjwvc3ZnPg==';
-                }}
               />
-            </motion.div>
+            </div>
           </div>
         </div>
       </div>
       
       {/* Mobile image (displayed only on smaller screens) */}
       <div className="md:hidden px-8 pb-16">
-        <motion.div 
-          className="relative w-full h-48"
-          animate={pulseAnimation}
-          transition={{
-            duration: 2,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        >
+        <div className="relative w-full h-48">
           <Image
             src="/hero-illustration.svg"
-            alt="ProofAI Documentation Illustration"
-            fill
-            className="object-contain"
+            alt="Secure video evidence illustration"
+            width={400}
+            height={300}
+            className="w-full h-full object-contain"
             priority
-            onError={(e) => {
-              // Fallback for when image doesn't exist
-              const target = e.target as HTMLImageElement;
-              target.onerror = null;
-              target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDMwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjMwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9IiNmOGY5ZmEiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9InN5c3RlbS11aSwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyMCIgZmlsbD0iIzZiN2VkNiI+UHJvdmlkZWQgaWxsdXN0cmF0aW9uPC90ZXh0Pjwvc3ZnPg==';
-            }}
           />
-        </motion.div>
+        </div>
       </div>
     </div>
   );

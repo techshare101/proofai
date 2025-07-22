@@ -14,15 +14,21 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${requestUrl.origin}?error=no_code`);
     }
 
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (error) {
       console.error('Auth error:', error);
       return NextResponse.redirect(`${requestUrl.origin}?error=${error.message}`);
     }
 
-    // URL to redirect to after sign in process completes
-    return NextResponse.redirect(`${requestUrl.origin}${next}`);
+    // Check if this is a new user (just confirmed email)
+    const isNewUser = data?.user?.confirmed_at && 
+                     data.user.created_at === data.user.updated_at;
+
+    // Redirect to pricing page for new users, otherwise to the intended destination
+    const redirectPath = isNewUser ? '/pricing' : next;
+    
+    return NextResponse.redirect(`${requestUrl.origin}${redirectPath}`);
   } catch (err) {
     console.error('Callback error:', err);
     return NextResponse.redirect(`${new URL(request.url).origin}?error=callback_error`);

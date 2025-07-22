@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { planLimits, formatRecordingTime } from '../../lib/recordingLimits';
+import { formatRecordingTime } from '../../lib/recordingLimits';
+import { planLimits, getPlanDisplayName } from '@/lib/stripe/plansConfig';
 
 interface RecorderPlanDebugProps {
   onPlanChange: (plan: string) => void;
@@ -15,10 +16,12 @@ export default function RecorderPlanDebug({ onPlanChange, currentPlan }: Recorde
   const [isOpen, setIsOpen] = useState(false);
   
   // Generate plan options from planLimits
-  const planOptions = Object.entries(planLimits).map(([plan, seconds]) => ({
-    plan,
+  const planOptions = Object.entries(planLimits).map(([planKey, seconds]) => ({
+    plan: planKey,
+    name: getPlanDisplayName(planKey),
     seconds,
-    formatted: formatRecordingTime(seconds)
+    formatted: formatRecordingTime(seconds),
+    isUnlimited: planKey === 'unlimited'
   }));
 
   return (
