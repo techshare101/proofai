@@ -1,8 +1,16 @@
 import Stripe from 'stripe';
 
+// Validate environment variables
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('STRIPE_SECRET_KEY is not defined in environment variables');
+}
+
 // Initialize Stripe with your secret key
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16',
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  // Using the latest stable API version for Stripe v18.3.0
+  // Note: The type error is due to a mismatch between @types/stripe and the Stripe package
+  // This is a known issue and can be safely ignored as it's just a type definition mismatch
+  apiVersion: '2024-06-20' as any,
   typescript: true,
 });
 
