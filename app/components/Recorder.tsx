@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { TranscriptionService } from '../services/transcriptionService'
 import { useRouter } from 'next/navigation'
-import { uploadRecording } from '@/lib/uploadRecording';
+import { uploadRecording } from '../lib/uploadRecording';
 import { useAuth } from '../contexts/AuthContext';
 import { useRecorder } from '../hooks/useRecorder';
 import { toast } from 'react-hot-toast';

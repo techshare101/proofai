@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { stripe } from '@/lib/stripe/config';
-import { PRICE_ID_TO_PLAN } from '@/lib/stripe/config';
 import { createClient } from '@supabase/supabase-js';
+import Stripe from 'stripe';
+
+// Import Stripe configuration using the path alias
+import { stripe, PRICE_ID_TO_PLAN } from '@/lib/stripe/config';
 
 export const dynamic = 'force-dynamic';
 
@@ -103,7 +105,17 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 
   // Calculate billing period
   const now = new Date();
-  const billingPeriodEnd = new Date(subscription.current_period_end * 1000);
+  const subscriptionData = subscription as unknown as {
+    current_period_end?: number;
+    current_period_start?: number;
+  };
+  
+  const currentPeriodEnd = subscriptionData.current_period_end 
+    ? new Date(subscriptionData.current_period_end * 1000) 
+    : null;
+  const currentPeriodStart = subscriptionData.current_period_start 
+    ? new Date(subscriptionData.current_period_start * 1000) 
+    : null;
   
   // Update or create the user's plan in Supabase
   await supabaseAdmin.from('user_plans').upsert({
@@ -111,12 +123,27 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     plan: plan.name,
     whisper_minutes_limit: plan.whisperMinutesLimit,
     whisper_minutes_used: 0, // Reset used minutes on new subscription
-    billing_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-    billing_period_end: billingPeriodEnd.toISOString(),
+    billing_period_start: currentPeriodStart?.toISOString() || now.toISOString(),
+    billing_period_end: currentPeriodEnd?.toISOString() || 
+      new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(), // Default to 30 days if not set
     status: subscription.status,
     stripe_subscription_id: subscription.id,
     stripe_customer_id: customerId,
     updated_at: now.toISOString(),
+  });
+  
+  // Also update the user_subscription_status table
+  await supabaseAdmin.from('user_subscription_status').upsert({
+    user_id: user.id,
+    has_active_subscription: subscription.status === 'active' || subscription.status === 'trialing',
+    subscription_status: subscription.status,
+    subscription_status_detail: subscription.status,
+    current_plan: plan.name,
+    stripe_customer_id: customerId,
+    stripe_price_id: priceId,
+    stripe_current_period_end: currentPeriodEnd?.toISOString(),
+    cancel_at_period_end: subscription.cancel_at_period_end || false,
+    subscription_updated_at: now.toISOString()
   });
 }
 

@@ -4,29 +4,46 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
+interface SubscriptionStatus {
+  hasActiveSubscription: boolean;
+  subscriptionStatus?: string;
+  subscriptionStatusDetail?: string;
+  currentPlan?: string;
+  stripeCustomerId?: string;
+  stripePriceId?: string;
+  currentPeriodEnd?: string | null;
+  cancelAtPeriodEnd?: boolean;
+}
+
 interface AuthContextType {
   user: any;
   isLoading: boolean;
   hasActiveSubscription: boolean;
-  refreshSubscription: () => Promise<void>;
+  subscription: SubscriptionStatus | null;
+  refreshSubscription: () => Promise<SubscriptionStatus | null>;
 }
 
-const AuthContext = createContext<AuthContextType>({ 
+const defaultContextValue: AuthContextType = {
   user: null,
   isLoading: true,
   hasActiveSubscription: false,
-  refreshSubscription: async () => {}
-})
+  subscription: null,
+  refreshSubscription: async () => null
+}
+
+const AuthContext = createContext<AuthContextType>(defaultContextValue)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClientComponentClient()
   const [user, setUser] = useState<any>(null)
-  const [hasActiveSubscription, setHasActiveSubscription] = useState(false)
+  const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null)
   const [loading, setLoading] = useState(true)
+  
+  const hasActiveSubscription = subscription?.hasActiveSubscription || false
   const router = useRouter()
   const pathname = usePathname()
 
-  const checkSubscription = async (userId: string) => {
+  const checkSubscription = async (userId: string): Promise<SubscriptionStatus> => {
     try {
       // Check the user_subscription_status table
       const { data: subscriptionStatus, error } = await supabase
@@ -35,72 +52,72 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('user_id', userId)
         .single()
       
+      // If the row doesn't exist, create it
+      if (error?.code === 'PGRST116') {
+        console.log('Creating new subscription status record for user:', userId)
+        const { data: newStatus } = await supabase
+          .from('user_subscription_status')
+          .insert([{ 
+            user_id: userId,
+            has_active_subscription: false,
+            subscription_status: 'inactive',
+            subscription_status_detail: 'inactive',
+            current_plan: 'free',
+            cancel_at_period_end: false
+          }])
+          .select()
+          .single()
+        
+        const initialStatus: SubscriptionStatus = {
+          hasActiveSubscription: false,
+          subscriptionStatus: 'inactive',
+          subscriptionStatusDetail: 'inactive',
+          currentPlan: 'free',
+          cancelAtPeriodEnd: false
+        }
+        
+        setSubscription(initialStatus)
+        return initialStatus
+      }
+      
       if (error) {
         console.error('Error checking subscription status:', error)
-        
-        // If the row doesn't exist, create it
-        if (error.code === 'PGRST116') {
-          const { data: newStatus } = await supabase
-            .from('user_subscription_status')
-            .insert([{ user_id: userId }])
-            .select()
-            .single()
-          
-          setHasActiveSubscription(false)
-          return false
-        }
-        
-        // Fallback to profiles table if there's another error
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('has_active_subscription')
-          .eq('id', userId)
-          .single()
-        
-        const isActive = profile?.has_active_subscription || false
-        setHasActiveSubscription(isActive)
-        return isActive
+        throw error
       }
       
-      // Use the subscription status from the table
-      const isActive = subscriptionStatus?.has_active_subscription || false
-      setHasActiveSubscription(isActive)
-      
-      // If the subscription is active in profiles but not in the status table, update it
-      if (!isActive) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('has_active_subscription')
-          .eq('id', userId)
-          .single()
-        
-        if (profile?.has_active_subscription) {
-          await supabase
-            .from('user_subscription_status')
-            .update({ 
-              has_active_subscription: true,
-              subscription_status: 'active',
-              subscription_updated_at: new Date().toISOString()
-            })
-            .eq('user_id', userId)
-          
-          setHasActiveSubscription(true)
-          return true
-        }
+      // Map the subscription status to our interface
+      const subscriptionData: SubscriptionStatus = {
+        hasActiveSubscription: subscriptionStatus.has_active_subscription || false,
+        subscriptionStatus: subscriptionStatus.subscription_status || 'inactive',
+        subscriptionStatusDetail: subscriptionStatus.subscription_status_detail || 'inactive',
+        currentPlan: subscriptionStatus.current_plan || 'free',
+        stripeCustomerId: subscriptionStatus.stripe_customer_id,
+        stripePriceId: subscriptionStatus.stripe_price_id,
+        currentPeriodEnd: subscriptionStatus.stripe_current_period_end,
+        cancelAtPeriodEnd: subscriptionStatus.cancel_at_period_end || false
       }
       
-      return isActive
+      setSubscription(subscriptionData)
+      return subscriptionData
     } catch (error) {
       console.error('Error in checkSubscription:', error)
-      setHasActiveSubscription(false)
-      return false
+      const errorStatus: SubscriptionStatus = {
+        hasActiveSubscription: false,
+        subscriptionStatus: 'error',
+        subscriptionStatusDetail: 'error',
+        currentPlan: 'free',
+        cancelAtPeriodEnd: false
+      }
+      setSubscription(errorStatus)
+      return errorStatus
     }
   }
 
-  const refreshSubscription = async () => {
+  const refreshSubscription = async (): Promise<SubscriptionStatus | null> => {
     if (user?.id) {
-      await checkSubscription(user.id)
+      return checkSubscription(user.id)
     }
+    return null
   }
 
   useEffect(() => {
@@ -118,7 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } else {
         setUser(null)
-        setHasActiveSubscription(false)
+        setSubscription(null)
       }
       
       setLoading(false)
@@ -134,7 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await checkSubscription(session.user.id)
         } else {
           setUser(null)
-          setHasActiveSubscription(false)
+          setSubscription(null)
         }
       }
     )
@@ -188,6 +205,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user, 
       isLoading: loading, 
       hasActiveSubscription,
+      subscription,
       refreshSubscription 
     }}>
       {children}

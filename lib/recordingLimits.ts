@@ -1,4 +1,4 @@
-import { planLimits, getPlanDisplayName } from '@/lib/stripe/plansConfig';
+import { planLimits, getPlanDisplayName } from './stripe/plansConfig';
 
 // Default to 'free' if user has no plan or plan is unknown
 export function getUserPlan(user: any): string {

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { formatRecordingTime } from '../../lib/recordingLimits';
-import { planLimits, getPlanDisplayName } from '@/lib/stripe/plansConfig';
+import { planLimits, getPlanDisplayName } from '../lib/stripe/plansConfig';
 
 interface RecorderPlanDebugProps {
   onPlanChange: (plan: string) => void;
