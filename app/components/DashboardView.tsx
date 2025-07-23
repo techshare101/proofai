@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Trash2, FileText, Video, Loader2, RefreshCw, X, Upload } from 'lucide-react';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabase';
 
 interface Report {
   id?: string;

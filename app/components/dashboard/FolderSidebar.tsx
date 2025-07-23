@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
-import supabase from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import { deleteFolder } from '@/supabase/deleteFolder'
 import DroppableFolder from './DroppableFolder'
 import toast from 'react-hot-toast'

@@ -52,28 +52,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('user_id', userId)
         .single()
       
-      // If the row doesn't exist, create it
+      // Use upsert to handle both insert and update cases
+      const initialStatus: SubscriptionStatus = {
+        hasActiveSubscription: false,
+        subscriptionStatus: 'inactive',
+        subscriptionStatusDetail: 'inactive',
+        currentPlan: 'free',
+        cancelAtPeriodEnd: false
+      }
+      
       if (error?.code === 'PGRST116') {
-        console.log('Creating new subscription status record for user:', userId)
-        const { data: newStatus } = await supabase
+        console.log('Creating or updating subscription status record for user:', userId)
+        const { data: newStatus, error: upsertError } = await supabase
           .from('user_subscription_status')
-          .insert([{ 
-            user_id: userId,
-            has_active_subscription: false,
-            subscription_status: 'inactive',
-            subscription_status_detail: 'inactive',
-            current_plan: 'free',
-            cancel_at_period_end: false
-          }])
+          .upsert(
+            { 
+              user_id: userId,
+              has_active_subscription: false,
+              subscription_status: 'inactive',
+              subscription_status_detail: 'inactive',
+              current_plan: 'free',
+              cancel_at_period_end: false,
+              updated_at: new Date().toISOString()
+            },
+            { onConflict: 'user_id' }
+          )
           .select()
           .single()
-        
-        const initialStatus: SubscriptionStatus = {
-          hasActiveSubscription: false,
-          subscriptionStatus: 'inactive',
-          subscriptionStatusDetail: 'inactive',
-          currentPlan: 'free',
-          cancelAtPeriodEnd: false
+          
+        if (upsertError) {
+          console.error('Error upserting subscription status:', upsertError)
         }
         
         setSubscription(initialStatus)

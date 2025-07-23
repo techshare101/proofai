@@ -1,4 +1,4 @@
-import supabase from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 export async function fetchReportsByFolder(folderId: string, userId: string) {
   const { data, error } = await supabase

@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabase';
 
 export async function handleManualUpload(file: File, folderName: string, userId: string) {
   if (!file || !userId) {

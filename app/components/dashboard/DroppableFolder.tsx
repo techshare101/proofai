@@ -3,7 +3,7 @@
 import { useDroppable } from '@dnd-kit/core'
 import { ReactNode } from 'react'
 import FolderContextMenu from './FolderContextMenu'
-import supabase from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import { deleteFolder } from '@/supabase/deleteFolder'
 import toast from 'react-hot-toast'
 
