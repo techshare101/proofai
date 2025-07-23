@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 
-// Import Stripe configuration using the path alias
+// Import Stripe configuration
 import { stripe, PRICE_ID_TO_PLAN } from '@/lib/stripe/config';
 
 export const dynamic = 'force-dynamic';
