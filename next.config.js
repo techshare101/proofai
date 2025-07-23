@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const path = require('path');
+
 const nextConfig = {
   env: {
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
@@ -26,6 +28,13 @@ const nextConfig = {
     }
   ],
   webpack: (config) => {
+    // Add path aliases
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': path.resolve(__dirname, './'),
+      '@/lib': path.resolve(__dirname, 'lib'),
+    };
+
     config.module.rules.push({
       test: /\.(mp4|webm)$/,
       use: {
