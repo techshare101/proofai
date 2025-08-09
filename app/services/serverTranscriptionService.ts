@@ -39,11 +39,12 @@ export class ServerTranscriptionService {
       // Handle both Blob and URL string inputs
       const isUrl = typeof input === 'string';
       
-      console.log('🎤 Starting server-side transcription...', {
+      logger.transcription('Starting server-side transcription', {
         inputType: isUrl ? 'URL' : 'Blob',
         fileSize: !isUrl ? `${((input as Blob).size / 1024 / 1024).toFixed(2)} MB` : 'N/A',
         fileType: !isUrl ? (input as Blob).type : 'URL',
         language: language || 'auto',
+        service: 'ServerTranscriptionService'
       });
 
       // Set up request parameters
@@ -144,4 +145,5 @@ export class ServerTranscriptionService {
     }
   }
 }
+
 
