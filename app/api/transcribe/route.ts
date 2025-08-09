@@ -278,19 +278,10 @@ export async function POST(req: Request) {
       });
     }
     
+    logger.apiResponse('POST', '/api/transcribe', 200, undefined, { requestId });
     return NextResponse.json(enhancedResult);
   } catch (err) {
-    console.error("❌ API error:", err);
-    // Include more detailed error information
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    const errorName = err instanceof Error ? err.name : 'Unknown';
-    const errorStack = err instanceof Error ? err.stack : 'No stack trace';
-    
-    console.error({
-      name: errorName,
-      message: errorMessage,
-      stack: errorStack
-    });
+    logger.error("Transcription API error", err, { requestId });
     
     return NextResponse.json({ 
       error: "Server error during transcription", 
@@ -299,6 +290,7 @@ export async function POST(req: Request) {
     }, { status: 500 });
   }
 }
+
 
 
 
