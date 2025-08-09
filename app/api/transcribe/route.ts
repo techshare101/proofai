@@ -106,9 +106,11 @@ export async function POST(req: Request) {
         body: form,
       };
 
-      console.log("🔄 Calling OpenAI Whisper API...");
-      console.log(`🔗 Endpoint: ${apiUrl}`);
-      console.log(`🔑 API Key: ${apiKey ? 'Present' : 'MISSING'}`);
+      logger.transcription("Calling OpenAI Whisper API", { 
+        requestId, 
+        endpoint: apiUrl,
+        hasApiKey: !!apiKey 
+      });
       
       // Make the API call with a timeout
       const controller = new AbortController();
@@ -121,23 +123,37 @@ export async function POST(req: Request) {
       
       clearTimeout(timeoutId);
       
-      console.log(`🔄 OpenAI response status: ${openaiRes.status} ${openaiRes.statusText}`);
-      
-      // Log response headers for debugging
-      console.log('📋 Response headers:');
-      openaiRes.headers.forEach((value, key) => {
-        console.log(`  ${key}: ${value}`);
+      logger.transcription("OpenAI API response received", { 
+        requestId, 
+        status: openaiRes.status, 
+        statusText: openaiRes.statusText 
       });
+      
+      // Log response headers for debugging in development
+      if (process.env.NODE_ENV === 'development') {
+        const headers: Record<string, string> = {};
+        openaiRes.headers.forEach((value, key) => {
+          headers[key] = value;
+        });
+        logger.debug("OpenAI response headers", { requestId, headers });
+      }
       
       if (!openaiRes.ok) {
         const errorText = await openaiRes.text();
-        console.error('❌ OpenAI API Error Response:', errorText);
         let errorData;
         try {
           errorData = JSON.parse(errorText);
         } catch (e) {
           errorData = { error: { message: errorText } };
         }
+        
+        logger.error("OpenAI API request failed", undefined, { 
+          requestId, 
+          status: openaiRes.status, 
+          statusText: openaiRes.statusText,
+          errorResponse: errorText 
+        });
+        
         return NextResponse.json(
           { 
             error: 'OpenAI API request failed',
@@ -279,6 +295,7 @@ export async function POST(req: Request) {
     }, { status: 500 });
   }
 }
+
 
 
 
