@@ -22,16 +22,25 @@ export async function POST(req: Request) {
 
   const apiKey = process.env.OPENAI_API_KEY;
 
-  if (!apiKey) return NextResponse.json({ error: "Missing API key" }, { status: 500 });
+  if (!apiKey) {
+    logger.error("OpenAI API key not configured", undefined, { service: 'transcription' });
+    return NextResponse.json({ error: "Missing API key" }, { status: 500 });
+  }
+
+  const requestId = `transcribe-${Date.now()}`;
+  logger.apiRequest('POST', '/api/transcribe', { requestId, language });
 
   try {
     // Step 1: Download file from Supabase signed URL
-    console.log("📥 Downloading file from signed URL:", fileUrl?.substring(0, 50) + "...");
-    
     if (!fileUrl) {
-      console.error("Missing file URL in the request");
+      logger.error("Missing file URL in transcription request", undefined, { requestId });
       return NextResponse.json({ error: "Missing file URL" }, { status: 400 });
     }
+
+    logger.transcription("Starting file download from signed URL", { 
+      requestId, 
+      urlPreview: fileUrl?.substring(0, 50) + "..." 
+    });
     
     // Download file from signed URL
     let fileRes;
@@ -262,4 +271,5 @@ export async function POST(req: Request) {
     }, { status: 500 });
   }
 }
+
 
