@@ -1,7 +1,0 @@
-"use client";
-
-import DashboardViewNew from "@/components/DashboardViewNew";
-
-export default function DashboardPage() {
-  return <DashboardViewNew />;
-}
