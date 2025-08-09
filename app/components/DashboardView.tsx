@@ -322,7 +322,11 @@ export default function DashboardView() {
       fetchReports();
       return true;
     } catch (err: any) {
-      console.error('[GridPurge-GRID] Uncaught error in handleDeleteReport:', err);
+      logger.error('Uncaught error in report deletion', err, { 
+        component: 'DashboardView', 
+        operation: 'deleteReport',
+        reportId 
+      });
       toast.error(`Delete failed: ${err?.message || "Something went wrong"}`);
       return false;
     }
@@ -857,6 +861,7 @@ export default function DashboardView() {
     )}
   );
 }
+
 
 
 
