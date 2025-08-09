@@ -158,7 +158,11 @@ export default function DashboardView() {
       fetchReports(); // refresh UI
     } else {
       toast.error(`Failed to delete folder: ${result.error}`, { id: 'deleteFolder' });
-      console.error('[GridPurge] Folder delete error:', result.error);
+      logger.error('Folder deletion failed', undefined, { 
+        component: 'DashboardView', 
+        operation: 'deleteFolder',
+        error: result.error 
+      });
     }
   };
 
@@ -853,5 +857,6 @@ export default function DashboardView() {
     )}
   );
 }
+
 
 
