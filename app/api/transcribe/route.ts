@@ -85,15 +85,14 @@ export async function POST(req: Request) {
     // Only include language parameter if explicitly specified and not 'auto'
     // Omitting the language parameter allows Whisper to perform better auto-detection
     if (language && language !== "auto") {
-      console.log(`🔤 Using specified language: ${language}`);
+      logger.transcription("Using specified language for transcription", { requestId, language });
       form.append("language", language);
     } else {
-      console.log("🔤 Language parameter omitted for better auto-detection");
+      logger.transcription("Language parameter omitted for better auto-detection", { requestId });
     }
 
     // Step 3: Send to OpenAI
-    console.log("🔄 Calling OpenAI Whisper API...");
-    console.log("🔄 Request to OpenAI with file size:", file.size);
+    logger.transcription("Preparing OpenAI Whisper API request", { requestId, fileSize: file.size });
     
     // Call OpenAI API with enhanced error handling
     let openaiRes;
@@ -280,6 +279,7 @@ export async function POST(req: Request) {
     }, { status: 500 });
   }
 }
+
 
 
 
