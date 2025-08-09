@@ -47,24 +47,33 @@ export async function POST(req: Request) {
     try {
       fileRes = await fetch(fileUrl);
       
-      console.log(`📥 Download response status: ${fileRes.status} ${fileRes.statusText}`);
+      logger.transcription("File download response received", { 
+        requestId, 
+        status: fileRes.status, 
+        statusText: fileRes.statusText 
+      });
       
       if (!fileRes.ok) {
-        console.error(`Failed to download audio: ${fileRes.status} ${fileRes.statusText}`);
+        logger.error("Failed to download audio file", undefined, { 
+          requestId, 
+          status: fileRes.status, 
+          statusText: fileRes.statusText 
+        });
         return NextResponse.json({ error: `Download failed: ${fileRes.statusText}` }, { status: 500 });
       }
       
       // Check Content-Type header
       const contentType = fileRes.headers.get('content-type');
-      console.log(`📥 File content type: ${contentType}`);
+      logger.transcription("File content type detected", { requestId, contentType });
     } catch (downloadError) {
-      console.error("📥 Error during file download:", downloadError);
+      logger.error("Error during file download", downloadError, { requestId });
       return NextResponse.json({ error: `Download error: ${downloadError.message}` }, { status: 500 });
     }
     
     const blob = await fileRes.blob();
     const file = new File([blob], "recording.webm", { type: "video/webm" });
-    console.log(`✅ File downloaded: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
+    const fileSizeMB = (blob.size / 1024 / 1024).toFixed(2);
+    logger.transcription("File downloaded successfully", { requestId, fileSizeMB });
 
     // Step 2: Prepare OpenAI request
     const form = new FormData();
@@ -271,5 +280,6 @@ export async function POST(req: Request) {
     }, { status: 500 });
   }
 }
+
 
 
