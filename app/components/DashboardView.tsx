@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Trash2, FileText, Video, Loader2, RefreshCw, X, Upload } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
+import { logger } from '@/lib/logger';
 
 interface Report {
   id?: string;
@@ -107,7 +108,7 @@ export default function DashboardView() {
         setReports(formattedReports);
       }
     } catch (err: any) {
-      console.error('Error fetching reports:', err);
+      logger.error('Failed to fetch reports', err, { component: 'DashboardView', activeFolder });
       setError('Failed to load reports');
     } finally {
       setLoading(false);
@@ -157,7 +158,11 @@ export default function DashboardView() {
       fetchReports(); // refresh UI
     } else {
       toast.error(`Failed to delete folder: ${result.error}`, { id: 'deleteFolder' });
-      console.error('[GridPurge] Folder delete error:', result.error);
+      logger.error('Folder deletion failed', undefined, { 
+        component: 'DashboardView', 
+        operation: 'deleteFolder',
+        error: result.error 
+      });
     }
   };
 
@@ -317,7 +322,11 @@ export default function DashboardView() {
       fetchReports();
       return true;
     } catch (err: any) {
-      console.error('[GridPurge-GRID] Uncaught error in handleDeleteReport:', err);
+      logger.error('Uncaught error in report deletion', err, { 
+        component: 'DashboardView', 
+        operation: 'deleteReport',
+        reportId 
+      });
       toast.error(`Delete failed: ${err?.message || "Something went wrong"}`);
       return false;
     }
@@ -852,3 +861,7 @@ export default function DashboardView() {
     )}
   );
 }
+
+
+
+

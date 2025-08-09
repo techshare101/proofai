@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { resolveLanguageLabel } from '../utils/detectLanguage';
+import { logger } from '@/lib/logger';
 
 export interface TranscriptionResult {
   text: string;
@@ -38,11 +39,12 @@ export class ServerTranscriptionService {
       // Handle both Blob and URL string inputs
       const isUrl = typeof input === 'string';
       
-      console.log('🎤 Starting server-side transcription...', {
+      logger.transcription('Starting server-side transcription', {
         inputType: isUrl ? 'URL' : 'Blob',
         fileSize: !isUrl ? `${((input as Blob).size / 1024 / 1024).toFixed(2)} MB` : 'N/A',
         fileType: !isUrl ? (input as Blob).type : 'URL',
         language: language || 'auto',
+        service: 'ServerTranscriptionService'
       });
 
       // Set up request parameters
@@ -54,7 +56,10 @@ export class ServerTranscriptionService {
       // If input is a URL, use it directly
       if (isUrl) {
         // For URLs, we need to download the file first
-        console.log('🔗 Processing audio from URL:', (input as string).substring(0, 100) + '...');
+        logger.transcription('Processing audio from URL', { 
+          urlPreview: (input as string).substring(0, 100) + '...',
+          service: 'ServerTranscriptionService'
+        });
         requestParams.file_url = input as string;
       } else {
         // Convert Blob to File for OpenAI API
@@ -64,7 +69,10 @@ export class ServerTranscriptionService {
 
       const response = await this.openai.audio[translateToEnglish ? 'translations' : 'transcriptions'].create(requestParams);
 
-      console.log('✅ Transcription complete');
+      logger.transcription('Transcription completed successfully', { 
+        service: 'ServerTranscriptionService',
+        translateToEnglish 
+      });
 
       // Extract the detected language code from Whisper response
       // The language property is only available for transcriptions, not translations
@@ -77,11 +85,12 @@ export class ServerTranscriptionService {
       const originalLabel = language ? resolveLanguageLabel(language) : null;
       const wasLanguageCorrected = language !== '' && detectedCode !== language;
       
-      console.log('🌐 Language detection:', {
+      logger.transcription('Language detection completed', {
         provided: language || 'auto',
         detected: detectedCode,
         label: detectedLabel,
-        corrected: wasLanguageCorrected ? originalLabel : null
+        corrected: wasLanguageCorrected ? originalLabel : null,
+        service: 'ServerTranscriptionService'
       });
       
       return {
@@ -92,23 +101,12 @@ export class ServerTranscriptionService {
         correctedFrom: wasLanguageCorrected ? originalLabel : null
       };
     } catch (error: any) {
-      // Log detailed error information for debugging
-      console.error('❌ Server transcription error:', {
-        message: error.message,
-        status: error.status,
-        statusCode: error.statusCode,
-        code: error.code,
-        type: error.type,
-        param: error.param,
-        stack: error.stack,
-        response: error.response ? {
-          status: error.response.status,
-          statusText: error.response.statusText,
-          data: error.response.data
-        } : null,
-        apiKey: process.env.OPENAI_API_KEY ? 
-          `${process.env.OPENAI_API_KEY.substring(0, 7)}...${process.env.OPENAI_API_KEY.substring(process.env.OPENAI_API_KEY.length - 5)}` : 
-          'Missing'
+      logger.error('Server transcription failed', error, {
+        service: 'ServerTranscriptionService',
+        inputType: typeof input === 'string' ? 'URL' : 'Blob',
+        language: language || 'auto',
+        translateToEnglish,
+        hasApiKey: !!process.env.OPENAI_API_KEY
       });
       
       // Handle rate limit errors
@@ -143,3 +141,8 @@ export class ServerTranscriptionService {
     }
   }
 }
+
+
+
+
+

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
 
 // List of languages supported by the application
 const supportedLangs = ['en', 'es', 'fr', 'de', 'zh', 'ja', 'ko', 'ru', 'pt', 'it'];
@@ -21,40 +22,58 @@ export async function POST(req: Request) {
 
   const apiKey = process.env.OPENAI_API_KEY;
 
-  if (!apiKey) return NextResponse.json({ error: "Missing API key" }, { status: 500 });
+  if (!apiKey) {
+    logger.error("OpenAI API key not configured", undefined, { service: 'transcription' });
+    return NextResponse.json({ error: "Missing API key" }, { status: 500 });
+  }
+
+  const requestId = `transcribe-${Date.now()}`;
+  logger.apiRequest('POST', '/api/transcribe', { requestId, language });
 
   try {
     // Step 1: Download file from Supabase signed URL
-    console.log("📥 Downloading file from signed URL:", fileUrl?.substring(0, 50) + "...");
-    
     if (!fileUrl) {
-      console.error("Missing file URL in the request");
+      logger.error("Missing file URL in transcription request", undefined, { requestId });
       return NextResponse.json({ error: "Missing file URL" }, { status: 400 });
     }
+
+    logger.transcription("Starting file download from signed URL", { 
+      requestId, 
+      urlPreview: fileUrl?.substring(0, 50) + "..." 
+    });
     
     // Download file from signed URL
     let fileRes;
     try {
       fileRes = await fetch(fileUrl);
       
-      console.log(`📥 Download response status: ${fileRes.status} ${fileRes.statusText}`);
+      logger.transcription("File download response received", { 
+        requestId, 
+        status: fileRes.status, 
+        statusText: fileRes.statusText 
+      });
       
       if (!fileRes.ok) {
-        console.error(`Failed to download audio: ${fileRes.status} ${fileRes.statusText}`);
+        logger.error("Failed to download audio file", undefined, { 
+          requestId, 
+          status: fileRes.status, 
+          statusText: fileRes.statusText 
+        });
         return NextResponse.json({ error: `Download failed: ${fileRes.statusText}` }, { status: 500 });
       }
       
       // Check Content-Type header
       const contentType = fileRes.headers.get('content-type');
-      console.log(`📥 File content type: ${contentType}`);
+      logger.transcription("File content type detected", { requestId, contentType });
     } catch (downloadError) {
-      console.error("📥 Error during file download:", downloadError);
+      logger.error("Error during file download", downloadError, { requestId });
       return NextResponse.json({ error: `Download error: ${downloadError.message}` }, { status: 500 });
     }
     
     const blob = await fileRes.blob();
     const file = new File([blob], "recording.webm", { type: "video/webm" });
-    console.log(`✅ File downloaded: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
+    const fileSizeMB = (blob.size / 1024 / 1024).toFixed(2);
+    logger.transcription("File downloaded successfully", { requestId, fileSizeMB });
 
     // Step 2: Prepare OpenAI request
     const form = new FormData();
@@ -66,15 +85,14 @@ export async function POST(req: Request) {
     // Only include language parameter if explicitly specified and not 'auto'
     // Omitting the language parameter allows Whisper to perform better auto-detection
     if (language && language !== "auto") {
-      console.log(`🔤 Using specified language: ${language}`);
+      logger.transcription("Using specified language for transcription", { requestId, language });
       form.append("language", language);
     } else {
-      console.log("🔤 Language parameter omitted for better auto-detection");
+      logger.transcription("Language parameter omitted for better auto-detection", { requestId });
     }
 
     // Step 3: Send to OpenAI
-    console.log("🔄 Calling OpenAI Whisper API...");
-    console.log("🔄 Request to OpenAI with file size:", file.size);
+    logger.transcription("Preparing OpenAI Whisper API request", { requestId, fileSize: file.size });
     
     // Call OpenAI API with enhanced error handling
     let openaiRes;
@@ -88,9 +106,11 @@ export async function POST(req: Request) {
         body: form,
       };
 
-      console.log("🔄 Calling OpenAI Whisper API...");
-      console.log(`🔗 Endpoint: ${apiUrl}`);
-      console.log(`🔑 API Key: ${apiKey ? 'Present' : 'MISSING'}`);
+      logger.transcription("Calling OpenAI Whisper API", { 
+        requestId, 
+        endpoint: apiUrl,
+        hasApiKey: !!apiKey 
+      });
       
       // Make the API call with a timeout
       const controller = new AbortController();
@@ -103,23 +123,37 @@ export async function POST(req: Request) {
       
       clearTimeout(timeoutId);
       
-      console.log(`🔄 OpenAI response status: ${openaiRes.status} ${openaiRes.statusText}`);
-      
-      // Log response headers for debugging
-      console.log('📋 Response headers:');
-      openaiRes.headers.forEach((value, key) => {
-        console.log(`  ${key}: ${value}`);
+      logger.transcription("OpenAI API response received", { 
+        requestId, 
+        status: openaiRes.status, 
+        statusText: openaiRes.statusText 
       });
+      
+      // Log response headers for debugging in development
+      if (process.env.NODE_ENV === 'development') {
+        const headers: Record<string, string> = {};
+        openaiRes.headers.forEach((value, key) => {
+          headers[key] = value;
+        });
+        logger.debug("OpenAI response headers", { requestId, headers });
+      }
       
       if (!openaiRes.ok) {
         const errorText = await openaiRes.text();
-        console.error('❌ OpenAI API Error Response:', errorText);
         let errorData;
         try {
           errorData = JSON.parse(errorText);
         } catch (e) {
           errorData = { error: { message: errorText } };
         }
+        
+        logger.error("OpenAI API request failed", undefined, { 
+          requestId, 
+          status: openaiRes.status, 
+          statusText: openaiRes.statusText,
+          errorResponse: errorText 
+        });
+        
         return NextResponse.json(
           { 
             error: 'OpenAI API request failed',
@@ -206,12 +240,12 @@ export async function POST(req: Request) {
         originalTranscript: rawText
       };
       
-      console.log('✅ Transcript injected into summary fields');
+      logger.transcription("Transcript injected into summary fields", { requestId });
     }
     
     // Also ensure transcript is injected into structuredSummary if present
     if (result.structuredSummary || formData.get('structuredSummary')) {
-      console.log('📝 Injecting transcript into structuredSummary object...');
+      logger.transcription("Injecting transcript into structuredSummary object", { requestId });
       // Get existing structuredSummary
       const structuredSummary = result.structuredSummary || 
         JSON.parse(formData.get('structuredSummary') as string || '{}');
@@ -224,35 +258,30 @@ export async function POST(req: Request) {
         originalTranscript: rawText
       };
       
-      console.log('✅ Transcript injected into structuredSummary fields');
+      logger.transcription("Transcript injected into structuredSummary fields", { requestId });
     }
     
     // Add detailed logging about transcript
-    console.log(`🌐 Language details:`, {
+    logger.transcription("Transcription completed successfully", {
+      requestId,
       requestedLanguage: language || 'auto',
       detectedLanguage: enhancedResult.language || 'unknown',
       isSupported: detectedLang !== 'unsupported',
       transcriptLength: rawText.length,
+      hasTranscript: !!enhancedResult.transcript
     });
     
-    console.log(`📝 Raw transcript available: ${enhancedResult.transcript ? 'Yes' : 'No'} (${enhancedResult.transcript?.length || 0} chars)`);
     if (enhancedResult.transcript?.length > 0) {
-      console.log(`📝 Transcript preview: "${enhancedResult.transcript.substring(0, 50)}..."`);
+      logger.debug("Transcript preview", { 
+        requestId, 
+        preview: enhancedResult.transcript.substring(0, 50) + "..." 
+      });
     }
     
+    logger.apiResponse('POST', '/api/transcribe', 200, undefined, { requestId });
     return NextResponse.json(enhancedResult);
   } catch (err) {
-    console.error("❌ API error:", err);
-    // Include more detailed error information
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    const errorName = err instanceof Error ? err.name : 'Unknown';
-    const errorStack = err instanceof Error ? err.stack : 'No stack trace';
-    
-    console.error({
-      name: errorName,
-      message: errorMessage,
-      stack: errorStack
-    });
+    logger.error("Transcription API error", err, { requestId });
     
     return NextResponse.json({ 
       error: "Server error during transcription", 
@@ -261,3 +290,10 @@ export async function POST(req: Request) {
     }, { status: 500 });
   }
 }
+
+
+
+
+
+
+
