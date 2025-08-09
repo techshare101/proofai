@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { resolveLanguageLabel } from '../utils/detectLanguage';
+import { logger } from '@/lib/logger';
 
 export interface TranscriptionResult {
   text: string;
@@ -143,3 +144,4 @@ export class ServerTranscriptionService {
     }
   }
 }
+
