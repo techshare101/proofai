@@ -101,23 +101,12 @@ export class ServerTranscriptionService {
         correctedFrom: wasLanguageCorrected ? originalLabel : null
       };
     } catch (error: any) {
-      // Log detailed error information for debugging
-      console.error('❌ Server transcription error:', {
-        message: error.message,
-        status: error.status,
-        statusCode: error.statusCode,
-        code: error.code,
-        type: error.type,
-        param: error.param,
-        stack: error.stack,
-        response: error.response ? {
-          status: error.response.status,
-          statusText: error.response.statusText,
-          data: error.response.data
-        } : null,
-        apiKey: process.env.OPENAI_API_KEY ? 
-          `${process.env.OPENAI_API_KEY.substring(0, 7)}...${process.env.OPENAI_API_KEY.substring(process.env.OPENAI_API_KEY.length - 5)}` : 
-          'Missing'
+      logger.error('Server transcription failed', error, {
+        service: 'ServerTranscriptionService',
+        inputType: typeof input === 'string' ? 'URL' : 'Blob',
+        language: language || 'auto',
+        translateToEnglish,
+        hasApiKey: !!process.env.OPENAI_API_KEY
       });
       
       // Handle rate limit errors
@@ -152,6 +141,7 @@ export class ServerTranscriptionService {
     }
   }
 }
+
 
 
 
