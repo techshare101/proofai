@@ -240,12 +240,12 @@ export async function POST(req: Request) {
         originalTranscript: rawText
       };
       
-      console.log('✅ Transcript injected into summary fields');
+      logger.transcription("Transcript injected into summary fields", { requestId });
     }
     
     // Also ensure transcript is injected into structuredSummary if present
     if (result.structuredSummary || formData.get('structuredSummary')) {
-      console.log('📝 Injecting transcript into structuredSummary object...');
+      logger.transcription("Injecting transcript into structuredSummary object", { requestId });
       // Get existing structuredSummary
       const structuredSummary = result.structuredSummary || 
         JSON.parse(formData.get('structuredSummary') as string || '{}');
@@ -258,20 +258,24 @@ export async function POST(req: Request) {
         originalTranscript: rawText
       };
       
-      console.log('✅ Transcript injected into structuredSummary fields');
+      logger.transcription("Transcript injected into structuredSummary fields", { requestId });
     }
     
     // Add detailed logging about transcript
-    console.log(`🌐 Language details:`, {
+    logger.transcription("Transcription completed successfully", {
+      requestId,
       requestedLanguage: language || 'auto',
       detectedLanguage: enhancedResult.language || 'unknown',
       isSupported: detectedLang !== 'unsupported',
       transcriptLength: rawText.length,
+      hasTranscript: !!enhancedResult.transcript
     });
     
-    console.log(`📝 Raw transcript available: ${enhancedResult.transcript ? 'Yes' : 'No'} (${enhancedResult.transcript?.length || 0} chars)`);
     if (enhancedResult.transcript?.length > 0) {
-      console.log(`📝 Transcript preview: "${enhancedResult.transcript.substring(0, 50)}..."`);
+      logger.debug("Transcript preview", { 
+        requestId, 
+        preview: enhancedResult.transcript.substring(0, 50) + "..." 
+      });
     }
     
     return NextResponse.json(enhancedResult);
@@ -295,6 +299,7 @@ export async function POST(req: Request) {
     }, { status: 500 });
   }
 }
+
 
 
 
