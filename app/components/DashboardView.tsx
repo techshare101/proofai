@@ -108,7 +108,7 @@ export default function DashboardView() {
         setReports(formattedReports);
       }
     } catch (err: any) {
-      console.error('Error fetching reports:', err);
+      logger.error('Failed to fetch reports', err, { component: 'DashboardView', activeFolder });
       setError('Failed to load reports');
     } finally {
       setLoading(false);
@@ -853,4 +853,5 @@ export default function DashboardView() {
     )}
   );
 }
+
 
