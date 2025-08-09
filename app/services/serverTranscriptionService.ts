@@ -56,7 +56,10 @@ export class ServerTranscriptionService {
       // If input is a URL, use it directly
       if (isUrl) {
         // For URLs, we need to download the file first
-        console.log('🔗 Processing audio from URL:', (input as string).substring(0, 100) + '...');
+        logger.transcription('Processing audio from URL', { 
+          urlPreview: (input as string).substring(0, 100) + '...',
+          service: 'ServerTranscriptionService'
+        });
         requestParams.file_url = input as string;
       } else {
         // Convert Blob to File for OpenAI API
@@ -66,7 +69,10 @@ export class ServerTranscriptionService {
 
       const response = await this.openai.audio[translateToEnglish ? 'translations' : 'transcriptions'].create(requestParams);
 
-      console.log('✅ Transcription complete');
+      logger.transcription('Transcription completed successfully', { 
+        service: 'ServerTranscriptionService',
+        translateToEnglish 
+      });
 
       // Extract the detected language code from Whisper response
       // The language property is only available for transcriptions, not translations
@@ -145,5 +151,6 @@ export class ServerTranscriptionService {
     }
   }
 }
+
 
 
