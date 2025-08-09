@@ -85,11 +85,12 @@ export class ServerTranscriptionService {
       const originalLabel = language ? resolveLanguageLabel(language) : null;
       const wasLanguageCorrected = language !== '' && detectedCode !== language;
       
-      console.log('🌐 Language detection:', {
+      logger.transcription('Language detection completed', {
         provided: language || 'auto',
         detected: detectedCode,
         label: detectedLabel,
-        corrected: wasLanguageCorrected ? originalLabel : null
+        corrected: wasLanguageCorrected ? originalLabel : null,
+        service: 'ServerTranscriptionService'
       });
       
       return {
@@ -151,6 +152,7 @@ export class ServerTranscriptionService {
     }
   }
 }
+
 
 
 
