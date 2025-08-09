@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
 
 // List of languages supported by the application
 const supportedLangs = ['en', 'es', 'fr', 'de', 'zh', 'ja', 'ko', 'ru', 'pt', 'it'];
@@ -261,3 +262,4 @@ export async function POST(req: Request) {
     }, { status: 500 });
   }
 }
+
