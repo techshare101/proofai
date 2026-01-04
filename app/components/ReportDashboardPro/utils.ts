@@ -1,10 +1,29 @@
-import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 import { format, formatDistanceToNow } from 'date-fns';
 
-export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// Lazy-initialize Supabase client to avoid build-time errors
+let _supabase: ReturnType<typeof createBrowserClient> | null = null;
+
+export function getSupabase() {
+  if (!_supabase && typeof window !== 'undefined') {
+    _supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+  }
+  return _supabase;
+}
+
+// For backward compatibility - returns a proxy that lazy-initializes
+export const supabase = new Proxy({} as ReturnType<typeof createBrowserClient>, {
+  get(target, prop) {
+    const client = getSupabase();
+    if (!client) return () => Promise.resolve({ data: null, error: null });
+    const value = (client as any)[prop];
+    if (typeof value === 'function') return value.bind(client);
+    return value;
+  }
+});
 
 export interface Report {
   id: string;

@@ -1,17 +1,27 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createBrowserClient } from '@supabase/ssr';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 export const dynamic = "force-dynamic"; // Prevents static build
 
 const SummaryPage = () => {
-  const supabase = createClientComponentClient();
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [summary, setSummary] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    const client = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    setSupabase(client);
+  }, []);
+
   const fetchSummary = async () => {
+    if (!supabase) return;
     try {
       setLoading(true);
       setError(null);

@@ -8,6 +8,8 @@ import { motion } from 'framer-motion';
 import { toast, Toaster } from 'react-hot-toast';
 import Link from 'next/link';
 
+export const dynamic = "force-dynamic";
+
 export default function ReportDashboardProPage() {
   const { session } = useAuth();
   const [loading, setLoading] = useState(false);
