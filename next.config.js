@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  turbopack: {},
   env: {
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     GEOCODE_API_KEY: process.env.GEOCODE_API_KEY,
