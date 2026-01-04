@@ -1,5 +1,12 @@
-import supabase from '../lib/supabase';
+import { createBrowserClient } from '@supabase/ssr';
 import { v4 as uuidv4 } from 'uuid';
+
+function getSupabase() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
 
 // Sample report data
 const sampleReports = [
@@ -51,7 +58,7 @@ async function createFolders(userId: string) {
   
   for (const name of folderNames) {
     // Check if folder already exists for this user
-    const { data: existingFolder } = await supabase
+    const { data: existingFolder } = await getSupabase()
       .from('folders')
       .select('id, name')
       .eq('user_id', userId)
@@ -62,7 +69,7 @@ async function createFolders(userId: string) {
       folderMap[name] = existingFolder.id;
     } else {
       // Create new folder
-      const { data: newFolder, error } = await supabase
+      const { data: newFolder, error } = await getSupabase()
         .from('folders')
         .insert({
           id: uuidv4(),
@@ -125,7 +132,7 @@ export async function insertSampleReports(userId: string) {
       continue;
     }
     
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('reports')
       .insert({
         id: uuidv4(),

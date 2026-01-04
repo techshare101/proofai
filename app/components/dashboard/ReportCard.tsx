@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { Card } from '../ui/card'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createBrowserClient } from '@supabase/ssr'
 import { FaEye, FaTrash, FaEdit, FaEllipsisV } from 'react-icons/fa'
 import { deleteReportWithFiles } from './ReportDeleteHandler'
 import supabase from '../../lib/supabase'

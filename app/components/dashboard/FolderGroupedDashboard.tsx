@@ -7,7 +7,7 @@ import { useSwipeable } from 'react-swipeable';
 import TranscriptToggle from './TranscriptToggle';
 import ReportModal from './ReportModal';
 import { deleteReportWithFiles } from './ReportDeleteHandler';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createBrowserClient } from '@supabase/ssr';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 
@@ -44,7 +44,10 @@ interface FolderGroupedDashboardProps {
 }
 
 export default function FolderGroupedDashboard({ userId }: FolderGroupedDashboardProps) {
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
   
   // State
   const [loading, setLoading] = useState(true);

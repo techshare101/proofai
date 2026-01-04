@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaTimes, FaMapMarkerAlt, FaRegClock, FaFolder, FaDownload, FaUser, FaFilePdf } from 'react-icons/fa';
 import TranscriptToggle from './TranscriptToggle';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createBrowserClient } from '@supabase/ssr';
 
 interface Report {
   id: string;
@@ -31,7 +31,10 @@ interface ReportModalProps {
 }
 
 export default function ReportModal({ report, isOpen, onClose }: ReportModalProps) {
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
   const [showOriginal, setShowOriginal] = useState(false);
   const [validatedPdfUrl, setValidatedPdfUrl] = useState<string | null>(null);
   
