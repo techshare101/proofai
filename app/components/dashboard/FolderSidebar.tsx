@@ -24,6 +24,7 @@ export default function FolderSidebar({ userId, onReportDrop, className = '', ca
   const [activeFolder, setActiveFolder] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
+  const [deletingFolderId, setDeletingFolderId] = useState<string | null>(null)
 
   useEffect(() => {
     if (userId) {
@@ -124,27 +125,41 @@ export default function FolderSidebar({ userId, onReportDrop, className = '', ca
                 </div>
               </DroppableFolder>
               <button
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.stopPropagation();
-                  if (confirm('Delete this folder?')) {
-                    deleteFolder(folder.id, userId).then(() => {
+                  if (confirm('Delete this folder? Reports will be moved to All Reports.')) {
+                    setDeletingFolderId(folder.id);
+                    try {
+                      await deleteFolder(folder.id, userId);
                       // Re-fetch the folders list
-                      fetchFolders();
+                      await fetchFolders();
                       // If the active folder was deleted, reset to null
                       if (activeFolder === folder.id) {
                         setActiveFolder(null);
                         // Dispatch event with null folderId
                         window.dispatchEvent(new CustomEvent('folderChange', { detail: { folderId: null } }));
                       }
-                    }).catch(err => {
+                    } catch (err) {
                       console.error('Error deleting folder:', err);
                       setError('Failed to delete folder');
-                    });
+                    } finally {
+                      setDeletingFolderId(null);
+                    }
                   }
                 }}
-                className="text-red-500 text-sm ml-4 p-1 hover:bg-red-50 rounded"
+                disabled={deletingFolderId === folder.id}
+                className={`text-sm ml-4 p-1 rounded ${
+                  deletingFolderId === folder.id 
+                    ? 'text-gray-400 cursor-wait' 
+                    : 'text-red-500 hover:bg-red-50'
+                }`}
               >
-                Delete
+                {deletingFolderId === folder.id ? (
+                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : 'Delete'}
               </button>
             </div>
           ))

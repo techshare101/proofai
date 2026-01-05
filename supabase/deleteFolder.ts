@@ -42,7 +42,20 @@ export async function deleteFolder(folderId: string, userId: string) {
       if (deleteError) throw new Error(`Error deleting folder files: ${deleteError.message}`);
     }
     
-    // Step 3: Remove the folder from the database
+    // Step 3: Orphan all reports in this folder (move to "All Reports")
+    // CRITICAL: Do NOT delete reports when folder is deleted
+    const { error: orphanError } = await supabase
+      .from('reports')
+      .update({ folder_id: null })
+      .eq('folder_id', folderId)
+      .eq('user_id', userId);
+    
+    if (orphanError) {
+      console.warn(`Warning: Could not orphan reports: ${orphanError.message}`);
+      // Continue anyway - folder delete is more important
+    }
+    
+    // Step 4: Remove the folder from the database
     const { error } = await supabase
       .from('folders')
       .delete()
@@ -51,7 +64,7 @@ export async function deleteFolder(folderId: string, userId: string) {
     
     if (error) throw new Error(error.message);
     
-    console.log(`✅ Deleted folder ${folder.name}`);
+    console.log(`✅ Deleted folder ${folder.name} (reports moved to All Reports)`);
     return true;
   } catch (error) {
     console.error('Error in deleteFolder:', error);
