@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '../contexts/AuthContext'
 import supabase from '../lib/supabase'
 import Link from 'next/link'
-import ReportCard, { Report } from '../components/dashboard/ReportCard'
+import ReportCard, { Report, Folder } from '../components/dashboard/ReportCard'
 import { DndContext, DragEndEvent, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import EmptyState from '../components/dashboard/EmptyState'
 import LoadingSkeleton from '../components/dashboard/LoadingSkeleton'
@@ -25,6 +25,7 @@ export default function DashboardPage() {
   const { limits, isPro, isDevBypass, plan } = useUserPlan()
   const { used, limit, remaining, isUnlimited } = useRecordingLimit()
   const [reports, setReports] = useState<Report[]>([])
+  const [folders, setFolders] = useState<Folder[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -43,12 +44,31 @@ export default function DashboardPage() {
     })
   )
 
-  // Fetch reports when session changes
+  // Fetch reports and folders when session changes
   useEffect(() => {
     if (session?.user && !activeFolder) {
       fetchReports()
+      fetchFolders()
     }
   }, [session, activeFolder])
+  
+  // Fetch user's folders
+  const fetchFolders = async () => {
+    if (!session?.user?.id) return
+    
+    try {
+      const { data, error } = await supabase
+        .from('folders')
+        .select('id, name')
+        .eq('user_id', session.user.id)
+        .order('name')
+      
+      if (error) throw error
+      setFolders(data || [])
+    } catch (err) {
+      console.error('Error fetching folders:', err)
+    }
+  }
   
   // Set isBrowser to true after component mount for portal support
   useEffect(() => {
@@ -176,6 +196,37 @@ export default function DashboardPage() {
   
   const handleDeleteReport = (reportId: string) => {
     setReports(reports.filter(report => report.id !== reportId))
+  }
+  
+  // Handle moving a report to a folder via dropdown
+  const handleMoveReport = async (reportId: string, folderId: string | null) => {
+    try {
+      const { error } = await supabase
+        .from('reports')
+        .update({ folder_id: folderId })
+        .eq('id', reportId)
+      
+      if (error) throw error
+      
+      // Find folder name for UI update
+      const folderName = folderId 
+        ? folders.find(f => f.id === folderId)?.name || 'Unknown'
+        : 'Uncategorized'
+      
+      // Update local state
+      setReports(reports.map(report => 
+        report.id === reportId 
+          ? { ...report, folder_id: folderId, folder_name: folderName }
+          : report
+      ))
+      
+      setDragFeedback({ message: `Moved to ${folderName}`, type: 'success' })
+      setTimeout(() => setDragFeedback(null), 2000)
+    } catch (err) {
+      console.error('Error moving report:', err)
+      setDragFeedback({ message: 'Failed to move report', type: 'error' })
+      setTimeout(() => setDragFeedback(null), 3000)
+    }
   }
   
   // Handle report dropped in folder
@@ -438,6 +489,8 @@ export default function DashboardPage() {
                 reports={filteredReports}
                 onViewReport={(report) => window.open(report.pdf_url, '_blank')}
                 onDeleteReport={handleDeleteReport}
+                onMoveReport={handleMoveReport}
+                folders={folders}
               />
             )
           ) : (
