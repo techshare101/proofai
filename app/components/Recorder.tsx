@@ -127,7 +127,29 @@ export default function Recorder() {
   const [recordingTime, setRecordingTime] = useState(0)
   const [remainingTime, setRemainingTime] = useState(300) // 5 min default
   const recordingTimer = useRef<NodeJS.Timeout | null>(null)
+  const currentBlobSize = useRef<number>(0) // Track current recording size
   const MAX_RECORDING_SECONDS = 300 // 5 minutes hard limit
+  
+  // Unified hard stop function - called for BOTH time limit AND size limit
+  const hardStopRecording = (reason: 'time' | 'size') => {
+    console.log(`🛑 HARD STOP triggered: ${reason}`);
+    
+    // 1. Clear timer immediately
+    if (recordingTimer.current) {
+      clearInterval(recordingTimer.current);
+      recordingTimer.current = null;
+    }
+    
+    // 2. Force stop MediaRecorder
+    if (mediaRecorder?.state === 'recording') {
+      mediaRecorder.stop();
+    }
+    
+    // 3. Update UI state
+    setRecording(false);
+    
+    // Note: onstop handler will transition to 'processing' state
+  };
 
   // Toggle between front and back cameras
   const toggleCamera = () => {
@@ -271,6 +293,9 @@ export default function Recorder() {
         clearInterval(recordingTimer.current);
       }
       
+      // Reset blob size tracker
+      currentBlobSize.current = 0;
+      
       // Accurate timer with hard stop at limit
       recordingTimer.current = setInterval(() => {
         setRecordingTime(prevTime => {
@@ -278,10 +303,10 @@ export default function Recorder() {
           const remaining = Math.max(MAX_RECORDING_SECONDS - nextTime, 0);
           setRemainingTime(remaining);
           
-          // Hard stop at limit
+          // Hard stop at TIME limit
           if (remaining <= 0) {
             console.log('⏱️ Recording time limit reached - auto-stopping');
-            stopRecording();
+            hardStopRecording('time');
           }
           
           return nextTime;
@@ -290,18 +315,31 @@ export default function Recorder() {
 
       setStatus('recording');
       
-      // Optimized MediaRecorder with bitrate control for smaller files
+      // Optimized MediaRecorder with LOWER bitrate to prevent size overflow
+      // 800kbps video + 96kbps audio ≈ ~67MB/hour = ~5.6MB per 5 min (safe for 25MB limit)
       const recorder = new MediaRecorder(stream, {
         mimeType: 'video/webm;codecs=vp8,opus',
-        videoBitsPerSecond: 1_500_000,  // 1.5 Mbps - good quality, smaller files
-        audioBitsPerSecond: 128_000     // 128 kbps - clear audio for transcription
+        videoBitsPerSecond: 800_000,   // 0.8 Mbps - mobile-safe, prevents size overflow
+        audioBitsPerSecond: 96_000     // 96 kbps - clear audio for transcription
       });
 
       chunks.current = [];
 
       // Chunked recording - emits data every 5 seconds for memory efficiency
+      // Also tracks size and triggers hard stop if limit exceeded
+      const maxSizeBytes = limits.maxFileSizeMB * 1024 * 1024;
+      
       recorder.ondataavailable = e => {
-        if (e.data.size > 0) chunks.current.push(e.data);
+        if (e.data.size > 0) {
+          chunks.current.push(e.data);
+          currentBlobSize.current += e.data.size;
+          
+          // Check SIZE limit - hard stop if exceeded
+          if (currentBlobSize.current >= maxSizeBytes) {
+            console.warn(`📦 Max file size reached (${(currentBlobSize.current / 1024 / 1024).toFixed(1)}MB >= ${limits.maxFileSizeMB}MB) - forcing stop`);
+            hardStopRecording('size');
+          }
+        }
       };
 
       recorder.onstop = async () => {
