@@ -44,8 +44,8 @@ async function generatePdfWithRetry(data: {
       // Note: No need to save as separate file
 
       // RADICAL FIX: Force videoUrl into formatted summary 
-      if (typeof formattedSummary === 'object' && formattedSummary !== null) {
-        formattedSummary.videoUrl = videoUrl;
+      if (formattedSummary && typeof formattedSummary === 'object') {
+        (formattedSummary as any).videoUrl = videoUrl;
         console.log('✅ Injected video URL directly into formatted summary');
       }
       
@@ -302,6 +302,7 @@ export async function uploadRecording(audioBlob: Blob, location: string): Promis
     const payload = {
       title: `Proof Report – ${new Date().toLocaleString()}`, // Add default title
       file_url: signedUrl, // matches the DB schema
+      pdf_url: pdfResult, // Save the PDF URL to the database
       summary,
       original_transcript: transcript,
       translated_transcript: translatedTranscript,
