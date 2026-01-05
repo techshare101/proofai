@@ -3,12 +3,12 @@ export async function POST(req: Request) {
   const { lat, lng } = await req.json();
   console.log('Geocoding API check:', {
     envKeys: Object.keys(process.env).filter(key => !key.includes('KEY') && !key.includes('TOKEN')),
-    hasKey: !!process.env.GEOCODE_API_KEY,
+    hasKey: !!process.env.OPENCAGE_API_KEY,
     coords: { lat, lng }
   });
-  const apiKey = process.env.GEOCODE_API_KEY;
+  const apiKey = process.env.OPENCAGE_API_KEY;
   if (!apiKey) {
-    console.error("Missing GEOCODE_API_KEY environment variable");
+    console.error("Missing OPENCAGE_API_KEY environment variable");
     return Response.json({ address: "Unknown location" }, { status: 500 });
   }
 
