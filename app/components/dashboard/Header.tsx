@@ -17,7 +17,7 @@ export default function Header({ user }: HeaderProps) {
     try {
       setIsLoggingOut(true)
       await supabase.auth.signOut()
-      router.push('/')
+      router.push('/login')
     } catch (error) {
       console.error('Error signing out:', error)
     } finally {
