@@ -11,7 +11,7 @@ import { useRecordingLimit } from '../hooks/useRecordingLimit';
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
 
-type RecorderStatus = 'idle' | 'requesting' | 'ready' | 'recording' | 'uploading' | 'error';
+type RecorderStatus = 'idle' | 'requesting' | 'ready' | 'recording' | 'processing' | 'uploading' | 'done' | 'error';
 
 const StatusMessage = ({ status, error, recordingTime, maxRecordingTime = 300 }: { status: RecorderStatus; error?: string; recordingTime?: number; maxRecordingTime?: number }) => {
   // Format seconds to MM:SS
@@ -26,7 +26,9 @@ const StatusMessage = ({ status, error, recordingTime, maxRecordingTime = 300 }:
     requesting: 'Requesting camera access...',
     ready: 'Ready to record',
     recording: 'Recording in progress...',
-    uploading: 'Uploading video...',
+    processing: 'Processing recording...',
+    uploading: 'Uploading & generating report...',
+    done: 'Report ready!',
     error: error || 'An error occurred'
   };
 
@@ -310,6 +312,10 @@ export default function Recorder() {
           recordingTimer.current = null;
         }
         
+        // Transition to processing state
+        setStatus('processing');
+        setRecording(false);
+        
         const blob = new Blob(chunks.current, { type: 'video/webm' });
         
         // Check file size against plan limits
@@ -324,6 +330,7 @@ export default function Recorder() {
           return;
         }
         
+        // Transition to uploading state
         setStatus('uploading');
 
         let location = 'Unknown Location';
@@ -398,12 +405,30 @@ export default function Recorder() {
         if (result.reportUrl) {
           setReportUrl(result.reportUrl);
           setShowDownload(true);
+          
+          // Transition to done state
+          setStatus('done');
           toast.success('Report ready!');
+          
           // Refresh recording limit count after successful upload
           refreshLimit();
+          
+          // Auto-open report after short delay for smooth UX
+          setTimeout(() => {
+            window.open(result.reportUrl, '_blank');
+            
+            // Reset to ready state after opening report
+            setTimeout(() => {
+              setRecordingTime(0);
+              setRemainingTime(MAX_RECORDING_SECONDS);
+              setStatus('ready');
+              setShowDownload(false);
+            }, 500);
+          }, 800);
+        } else {
+          // No report URL - just reset to ready
+          setStatus('ready');
         }
-
-        setStatus('ready');
       };
 
       // Start with 5-second chunks for memory efficiency
@@ -425,11 +450,11 @@ export default function Recorder() {
   };
 
   const stopRecording = () => {
-    console.log('Stop recording button clicked');
+    console.log('Stop recording triggered');
     if (mediaRecorder?.state === 'recording') {
       console.log('Stopping media recorder...');
       mediaRecorder.stop();
-      setRecording(false);
+      // Note: setRecording(false) is called in recorder.onstop handler
     } else {
       console.warn(`MediaRecorder not in recording state. Current state: ${mediaRecorder?.state || 'undefined'}`);
     }
@@ -627,25 +652,45 @@ export default function Recorder() {
         </div>
 
         <div className="flex justify-center space-x-4">
-          <button
-            onClick={startRecording}
-            disabled={recording || !!error}
-            className={`px-6 py-3 font-bold rounded transition ${recording || error
-              ? 'bg-gray-400 cursor-not-allowed'
-              : 'bg-green-600 hover:bg-green-700 text-white'}`}
-          >
-            Start Recording
-          </button>
-
-          <button
-            onClick={stopRecording}
-            disabled={!recording}
-            className={`px-6 py-3 font-bold rounded transition ${!recording
-              ? 'bg-gray-400 cursor-not-allowed'
-              : 'bg-red-600 hover:bg-red-700 text-white'}`}
-          >
-            Stop Recording
-          </button>
+          {/* State-driven button: shows different states based on recorder status */}
+          {status === 'recording' ? (
+            <button
+              onClick={stopRecording}
+              className="px-6 py-3 font-bold rounded transition bg-red-600 hover:bg-red-700 text-white animate-pulse"
+            >
+              ⏹️ Stop Recording
+            </button>
+          ) : status === 'processing' || status === 'uploading' ? (
+            <button
+              disabled
+              className="px-6 py-3 font-bold rounded transition bg-blue-500 text-white cursor-wait flex items-center gap-2"
+            >
+              <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              {status === 'processing' ? 'Processing...' : 'Uploading...'}
+            </button>
+          ) : status === 'done' ? (
+            <button
+              disabled
+              className="px-6 py-3 font-bold rounded transition bg-green-500 text-white"
+            >
+              ✅ Report Ready!
+            </button>
+          ) : (
+            <button
+              onClick={startRecording}
+              disabled={status === 'error' || status === 'idle' || status === 'requesting' || !canRecord}
+              className={`px-6 py-3 font-bold rounded transition ${
+                status === 'ready' && canRecord
+                  ? 'bg-green-600 hover:bg-green-700 text-white'
+                  : 'bg-gray-400 cursor-not-allowed text-white'
+              }`}
+            >
+              🔴 Start Recording
+            </button>
+          )}
         </div>
 
         {showDownload && reportUrl && (
