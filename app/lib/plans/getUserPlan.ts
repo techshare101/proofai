@@ -33,7 +33,7 @@ const PLAN_LIMITS: Record<PlanType, UserPlan['limits']> = {
     maxFileSizeMB: 25,
     videoQuality: 'standard',
     pdfExport: true,
-    folders: false,
+    folders: true, // Allow folders for all users including starter
     watermark: true,
     aiSummary: false,
     customBranding: false,
