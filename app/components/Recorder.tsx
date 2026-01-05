@@ -1,3 +1,14 @@
+/**
+ * 🔒 SINGLE SOURCE OF TRUTH - DO NOT FORK
+ * This is the ONLY recorder component used by ALL plans.
+ * Legacy recorders have been removed.
+ * 
+ * Plan differences are handled via:
+ * - useUserPlan() for limits (maxFileSizeMB, etc.)
+ * - useRecordingLimit() for monthly recording counts
+ * 
+ * DO NOT create plan-based recorder forks (RecorderPro, RecorderFree, etc.)
+ */
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
