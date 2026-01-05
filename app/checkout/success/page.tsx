@@ -1,66 +1,60 @@
 /**
- * 🔒 STRIPE SUCCESS PAGE - SINGLE REDIRECT TARGET
+ * 🔒 STRIPE SUCCESS PAGE
  * This page MUST:
  * - Never redirect to /
  * - Never use plan-based routing
- * - Always redirect to /dashboard
+ * - Show thank you message
+ * - Let user click to go to dashboard
  */
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
 function CheckoutSuccessContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const sessionId = searchParams.get('session_id');
-  const [countdown, setCountdown] = useState(3);
-
-  // Auto-redirect to dashboard after short delay
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          // ALWAYS redirect to dashboard - no plan logic, no / route
-          router.replace('/dashboard');
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    
-    return () => clearInterval(timer);
-  }, [router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
-        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center mx-4">
+        {/* Success Icon */}
+        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">🎉 Payment Successful!</h1>
-        <p className="text-gray-600 mb-4">
-          Thank you for subscribing to ProofAI. Your account has been upgraded and you now have access to all premium features.
+
+        {/* Thank You Message */}
+        <h1 className="text-3xl font-bold text-gray-900 mb-3">Thank You! 🎉</h1>
+        <p className="text-lg text-gray-600 mb-2">
+          Your payment was successful.
         </p>
-        <p className="text-sm text-gray-500 mb-6">
-          Redirecting to dashboard in {countdown} seconds...
+        <p className="text-gray-500 mb-8">
+          Your account has been upgraded and you now have access to all your premium features. Start documenting your truth today!
         </p>
-        <button
-          onClick={() => router.replace('/dashboard')}
-          className="w-full px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition"
+
+        {/* Go to Dashboard Button */}
+        <Link
+          href="/dashboard"
+          className="block w-full px-6 py-4 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition shadow-lg hover:shadow-xl"
         >
-          Go to Dashboard
-        </button>
+          Go to Dashboard →
+        </Link>
+
+        {/* Secondary Action */}
         <Link
           href="/recorder"
-          className="inline-block w-full px-6 py-3 mt-3 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition"
+          className="inline-block w-full px-6 py-3 mt-4 text-blue-600 font-medium hover:text-blue-700 transition"
         >
-          Start Recording
+          Or start recording now
         </Link>
+
+        {/* Support Note */}
+        <p className="text-xs text-gray-400 mt-8">
+          Questions? Contact us at support@proofai.app
+        </p>
       </div>
     </div>
   );
