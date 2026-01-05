@@ -94,18 +94,48 @@ export default function FolderSidebar({ userId, onReportDrop, className = '', ca
 
   return (
     <aside className={`w-64 bg-white border-r border-gray-200 p-4 overflow-y-auto ${className}`}>
-      <div className="mb-6">
+      <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-800">Folders</h2>
+        {/* + New Folder button in header */}
+        {canUseFolders && !isCreating && (
+          <button
+            onClick={() => setIsCreating(true)}
+            className="text-blue-600 hover:text-blue-800 p-1"
+            title="New Folder"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+          </button>
+        )}
       </div>
       
       {/* Folder list */}
       <nav className="space-y-1 mb-6">
+        {/* All Reports option */}
+        <button
+          onClick={() => {
+            setActiveFolder(null)
+            window.dispatchEvent(new CustomEvent('folderChange', { detail: { folderId: null } }))
+          }}
+          className={`w-full flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
+            activeFolder === null 
+              ? 'bg-blue-50 text-blue-700 font-medium' 
+              : 'text-gray-700 hover:bg-gray-100'
+          }`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+          All Reports
+        </button>
+        
         {isLoading ? (
-          <div className="text-sm text-gray-500">Loading folders...</div>
+          <div className="text-sm text-gray-500 px-3 py-2">Loading folders...</div>
         ) : error ? (
-          <div className="text-sm text-red-500">{error}</div>
+          <div className="text-sm text-red-500 px-3 py-2">{error}</div>
         ) : folders.length === 0 ? (
-          <div className="text-sm text-gray-500">No folders found</div>
+          <div className="text-sm text-gray-500 px-3 py-2">No folders yet</div>
         ) : (
           folders.map((folder) => (
             <div key={folder.id} className="flex justify-between items-center">
@@ -167,7 +197,7 @@ export default function FolderSidebar({ userId, onReportDrop, className = '', ca
       </nav>
       
       {/* New folder input */}
-      <div>
+      <div className="mt-4 pt-4 border-t border-gray-200">
         {!canUseFolders ? (
           <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
             <p className="text-sm text-gray-600 mb-2">Folders require Community plan or higher</p>
@@ -184,14 +214,23 @@ export default function FolderSidebar({ userId, onReportDrop, className = '', ca
               type="text"
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && newFolderName.trim()) {
+                  handleCreateFolder()
+                } else if (e.key === 'Escape') {
+                  setIsCreating(false)
+                  setNewFolderName('')
+                }
+              }}
               placeholder="Folder name"
-              className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+              autoFocus
+              className="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <div className="flex space-x-2">
               <button
                 onClick={handleCreateFolder}
                 disabled={!newFolderName.trim()}
-                className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                className="flex-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
               >
                 Create
               </button>
@@ -200,7 +239,7 @@ export default function FolderSidebar({ userId, onReportDrop, className = '', ca
                   setIsCreating(false)
                   setNewFolderName('')
                 }}
-                className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+                className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
               >
                 Cancel
               </button>
