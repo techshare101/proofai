@@ -131,11 +131,31 @@ export default function DashboardPage() {
             }
           }
           
+          // Normalize PDF URL - convert signed URLs to public URLs
+          let finalPdfUrl = item.pdf_url
+          if (finalPdfUrl) {
+            // Handle signed URLs for proofai-pdfs bucket
+            if (finalPdfUrl.includes('/object/sign/proofai-pdfs/')) {
+              const match = finalPdfUrl.match(/\/proofai-pdfs\/(.+?)(\?|$)/)
+              if (match) {
+                finalPdfUrl = `https://fiwtckfmtbcxryhhggsb.supabase.co/storage/v1/object/public/proofai-pdfs/${match[1]}`
+              }
+            }
+            // Handle other signed URL patterns
+            else if (finalPdfUrl.includes('/object/sign/')) {
+              // Try to extract bucket and path
+              const match = finalPdfUrl.match(/\/object\/sign\/([^/]+)\/(.+?)(\?|$)/)
+              if (match) {
+                finalPdfUrl = `https://fiwtckfmtbcxryhhggsb.supabase.co/storage/v1/object/public/${match[1]}/${match[2]}`
+              }
+            }
+          }
+          
           return {
             id: item.id,
             title: item.title || 'Untitled Report',
             summary: summaryText,
-            pdf_url: item.pdf_url,
+            pdf_url: finalPdfUrl,
             file_url: item.file_url,
             video_url: finalVideoUrl,
             folder_id: item.folder_id,
