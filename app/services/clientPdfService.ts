@@ -1,3 +1,21 @@
+/**
+ * 🚨 CANONICAL FILE — DO NOT MODIFY 🚨
+ *
+ * This file is production-locked.
+ * Any changes will cause regressions.
+ *
+ * Allowed actions:
+ *  - Read only
+ *  - Import only
+ *
+ * DO NOT:
+ *  - Refactor
+ *  - Reformat
+ *  - Rename
+ *  - "Improve"
+ *
+ * Changes require explicit human approval.
+ */
 import { base64ToBlob } from '../utils/base64';
 import { StructuredSummary } from '../types/pdf';
 

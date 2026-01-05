@@ -1,4 +1,22 @@
 /**
+ * 🚨 CANONICAL FILE — DO NOT MODIFY 🚨
+ *
+ * This file is production-locked.
+ * Any changes will cause regressions.
+ *
+ * Allowed actions:
+ *  - Read only
+ *  - Import only
+ *
+ * DO NOT:
+ *  - Refactor
+ *  - Reformat
+ *  - Rename
+ *  - "Improve"
+ *
+ * Changes require explicit human approval.
+ * 
+ * ---
  * 🔒 SINGLE SOURCE OF TRUTH - DO NOT FORK
  * This is the ONLY recorder component used by ALL plans.
  * Legacy recorders have been removed.

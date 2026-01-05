@@ -1,3 +1,21 @@
+/**
+ * 🚨 CANONICAL FILE — DO NOT MODIFY 🚨
+ *
+ * This file is production-locked.
+ * Any changes will cause regressions.
+ *
+ * Allowed actions:
+ *  - Read only
+ *  - Import only
+ *
+ * DO NOT:
+ *  - Refactor
+ *  - Reformat
+ *  - Rename
+ *  - "Improve"
+ *
+ * Changes require explicit human approval.
+ */
 // lib/uploadRecording.ts
 import { getAddressFromCoordinates } from "@/utils/geocodeAddress";
 import { TranscriptionService, TranscriptionResult } from '../services/transcriptionService';

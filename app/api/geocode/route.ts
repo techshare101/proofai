@@ -1,3 +1,21 @@
+/**
+ * 🚨 CANONICAL FILE — DO NOT MODIFY 🚨
+ *
+ * This file is production-locked.
+ * Any changes will cause regressions.
+ *
+ * Allowed actions:
+ *  - Read only
+ *  - Import only
+ *
+ * DO NOT:
+ *  - Refactor
+ *  - Reformat
+ *  - Rename
+ *  - "Improve"
+ *
+ * Changes require explicit human approval.
+ */
 // app/api/geocode/route.ts
 export async function POST(req: Request) {
   const { lat, lng } = await req.json();
