@@ -6,7 +6,10 @@ import { useRouter } from 'next/navigation'
 import { uploadRecording } from '@/lib/uploadRecording';
 import { useAuth } from '../contexts/AuthContext';
 import { useRecorder } from '../hooks/useRecorder';
+import { useUserPlan } from '../hooks/useUserPlan';
+import { useRecordingLimit } from '../hooks/useRecordingLimit';
 import { toast } from 'react-hot-toast';
+import Link from 'next/link';
 
 type RecorderStatus = 'idle' | 'requesting' | 'ready' | 'recording' | 'uploading' | 'error';
 
@@ -48,6 +51,8 @@ const StatusMessage = ({ status, error, recordingTime }: { status: RecorderStatu
 
 export default function Recorder() {
   const router = useRouter()
+  const { limits, isPro, isDevBypass } = useUserPlan()
+  const { canRecord, used, limit, remaining, isUnlimited, message: limitMessage, refresh: refreshLimit } = useRecordingLimit()
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const [recording, setRecording] = useState(false)
@@ -183,6 +188,14 @@ export default function Recorder() {
 
   const startRecording = async () => {
     console.log('Start recording button clicked');
+    
+    // Check recording limit before starting
+    if (!canRecord) {
+      setError(`Recording limit reached. ${limitMessage}`);
+      toast.error('Recording limit reached. Upgrade to continue.');
+      return;
+    }
+    
     const stream = streamRef.current;
     if (!stream) {
       console.error('Stream not available for recording');
@@ -231,8 +244,21 @@ export default function Recorder() {
           recordingTimer.current = null;
         }
         
-        setStatus('uploading');
         const blob = new Blob(chunks.current, { type: 'video/webm' });
+        
+        // Check file size against plan limits
+        const fileSizeMB = blob.size / (1024 * 1024);
+        const maxSize = limits.maxFileSizeMB;
+        console.log(`📊 Recording size: ${fileSizeMB.toFixed(2)} MB (limit: ${maxSize} MB, plan: ${isDevBypass ? 'dev-bypass' : isPro ? 'pro' : 'free'})`);
+        
+        if (fileSizeMB > maxSize) {
+          setError(`Recording too large (${fileSizeMB.toFixed(1)} MB). Max allowed: ${maxSize} MB. Try a shorter recording.`);
+          setStatus('error');
+          toast.error(`Recording exceeds ${maxSize} MB limit`);
+          return;
+        }
+        
+        setStatus('uploading');
 
         let location = 'Unknown Location';
         try {
@@ -289,6 +315,8 @@ export default function Recorder() {
           setReportUrl(result.reportUrl);
           setShowDownload(true);
           toast.success('Report ready!');
+          // Refresh recording limit count after successful upload
+          refreshLimit();
         }
 
         setStatus('ready');
@@ -366,6 +394,39 @@ export default function Recorder() {
       </div>
 
       <div className="flex flex-col items-center space-y-4">
+        {/* Recording Limit Indicator */}
+        {!isUnlimited && (
+          <div className={`w-full max-w-md px-4 py-2 rounded-lg text-sm ${
+            canRecord 
+              ? 'bg-blue-50 text-blue-700 border border-blue-200' 
+              : 'bg-red-50 text-red-700 border border-red-200'
+          }`}>
+            <div className="flex items-center justify-between">
+              <span>
+                {canRecord 
+                  ? `${remaining} of ${limit} recordings remaining this month`
+                  : `Monthly limit reached (${used}/${limit})`
+                }
+              </span>
+              {!canRecord && (
+                <Link 
+                  href="/#pricing" 
+                  className="ml-2 px-3 py-1 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition"
+                >
+                  Upgrade
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
+        
+        {/* Dev Bypass Indicator */}
+        {isDevBypass && (
+          <div className="w-full max-w-md px-4 py-2 rounded-lg text-sm bg-purple-50 text-purple-700 border border-purple-200">
+            <span className="font-medium">🔧 Dev Mode:</span> Unlimited recordings enabled
+          </div>
+        )}
+
         <StatusMessage status={status} error={error} recordingTime={recording ? recordingTime : undefined} />
 
         {/* Advanced Settings Button */}

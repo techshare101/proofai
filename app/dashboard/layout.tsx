@@ -7,9 +7,11 @@ import { User } from '@supabase/supabase-js'
 import Header from '../components/dashboard/Header'
 import FolderSidebar from '../components/dashboard/FolderSidebar'
 import { HiOutlineMenu, HiOutlineX } from 'react-icons/hi'
+import { useUserPlan } from '../hooks/useUserPlan'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { session } = useAuth()
+  const { limits } = useUserPlan()
   const [user, setUser] = useState<User | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -68,13 +70,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               transition-transform duration-300 ease-in-out
             `}
           >
-            <FolderSidebar userId={user?.id} className="h-full" />
+            <FolderSidebar userId={user?.id} className="h-full" canUseFolders={limits.folders} />
           </div>
         </div>
 
         {/* Desktop Sidebar (always visible on md+) */}
         <div className="hidden md:block">
-          <FolderSidebar userId={user?.id} />
+          <FolderSidebar userId={user?.id} canUseFolders={limits.folders} />
         </div>
 
         {/* Main Content */}

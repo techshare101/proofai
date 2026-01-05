@@ -12,14 +12,18 @@ import LoadingSkeleton from '../components/dashboard/LoadingSkeleton'
 import PDFViewerModal from '../components/dashboard/PDFViewerModal'
 import { insertDummyReport } from '../utils/insertDummyReport'
 import ReportList from '../components/ReportList'
-import { fetchReportsByFolder } from '../../supabase/fetchReportsByFolder'
+import { fetchReportsByFolder } from '../utils/fetchReportsByFolder'
 import { Switch } from '@headlessui/react'
 import { FaTable, FaThLarge } from 'react-icons/fa'
 import { HiOutlineDocument } from 'react-icons/hi'
 import FolderGroupedReports from '../components/dashboard/FolderGroupedReports'
+import { useUserPlan } from '../hooks/useUserPlan'
+import { useRecordingLimit } from '../hooks/useRecordingLimit'
 
 export default function DashboardPage() {
   const { session } = useAuth()
+  const { limits, isPro, isDevBypass, plan } = useUserPlan()
+  const { used, limit, remaining, isUnlimited } = useRecordingLimit()
   const [reports, setReports] = useState<Report[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -70,7 +74,7 @@ export default function DashboardPage() {
         const { data: allData, error } = await supabase
           .from('reports')
           .select(`
-            id, title, summary, pdf_url, folder_id, created_at,
+            id, title, summary, pdf_url, file_url, folder_id, created_at,
             folders(name)
           `)
           .eq('user_id', session.user.id)
@@ -88,12 +92,53 @@ export default function DashboardPage() {
             ? item.folders[0]?.name
             : (item.folders as any)?.name || 'Uncategorized'
           
+          // Extract video URL from summary JSONB or file_url
+          let videoUrl: string | null = null
+          let summaryText: string = 'No summary available'
+          
+          if (item.summary) {
+            // Check if summary is a JSONB object
+            if (typeof item.summary === 'object') {
+              const summaryObj = item.summary as any
+              videoUrl = summaryObj.videoUrl || summaryObj.video_url || null
+              summaryText = summaryObj.summary || 'No summary available'
+            } else if (typeof item.summary === 'string') {
+              // Try to parse as JSON
+              try {
+                const parsed = JSON.parse(item.summary)
+                videoUrl = parsed.videoUrl || parsed.video_url || null
+                summaryText = parsed.summary || item.summary
+              } catch {
+                summaryText = item.summary
+              }
+            }
+          }
+          
+          // Determine the actual video URL - prefer extracted videoUrl, then check file_url
+          let finalVideoUrl = videoUrl
+          if (!finalVideoUrl && item.file_url) {
+            // Only use file_url as video if it's a video file (not a PDF)
+            if (item.file_url.includes('.webm') || item.file_url.includes('.mp4') || item.file_url.includes('.mov')) {
+              finalVideoUrl = item.file_url
+            }
+          }
+          
+          // Normalize signed URLs to public URLs for recordings bucket
+          if (finalVideoUrl && finalVideoUrl.includes('/object/sign/recordings/')) {
+            const match = finalVideoUrl.match(/\/recordings\/(.+?)(\?|$)/)
+            if (match) {
+              finalVideoUrl = `https://fiwtckfmtbcxryhhggsb.supabase.co/storage/v1/object/public/recordings/${match[1]}`
+            }
+          }
+          
           return {
             id: item.id,
             title: item.title || 'Untitled Report',
-            summary: item.summary || 'No summary available',
+            summary: summaryText,
             pdf_url: item.pdf_url,
-            folder_id: item.folder_id, // Use folder_id directly from DB
+            file_url: item.file_url,
+            video_url: finalVideoUrl,
+            folder_id: item.folder_id,
             folder_name: folderName,
             created_at: item.created_at
           }
@@ -227,8 +272,47 @@ export default function DashboardPage() {
         <div className="flex-1">
       {/* Header section */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">Your Reports</h1>
-        <p className="text-gray-600">Manage and view your PDF reports</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Your Reports</h1>
+            <p className="text-gray-600">Manage and view your PDF reports</p>
+          </div>
+          
+          {/* Plan Badge & Usage */}
+          <div className="flex items-center gap-4">
+            {/* Recording Usage */}
+            {!isUnlimited && (
+              <div className="text-sm text-gray-600">
+                <span className="font-medium">{remaining}</span> of {limit} recordings left
+              </div>
+            )}
+            
+            {/* Plan Badge */}
+            <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+              isDevBypass 
+                ? 'bg-purple-100 text-purple-700' 
+                : isPro 
+                  ? 'bg-green-100 text-green-700' 
+                  : 'bg-gray-100 text-gray-700'
+            }`}>
+              {isDevBypass ? '🔧 Dev Mode' : plan.plan === 'starter' ? '🕊️ Starter' : 
+               plan.plan === 'community' ? '🤝 Community' :
+               plan.plan === 'self_defender' ? '🛡️ Self-Defender' :
+               plan.plan === 'emergency_pack' ? '🚨 Emergency' :
+               plan.plan === 'mission_partner' ? '🌍 Partner' : plan.plan}
+            </div>
+            
+            {/* Upgrade CTA for free users */}
+            {!isPro && !isDevBypass && (
+              <Link 
+                href="/#pricing"
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
+              >
+                Upgrade
+              </Link>
+            )}
+          </div>
+        </div>
       </div>
       
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">

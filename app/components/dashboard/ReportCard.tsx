@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Card } from '../ui/card'
 import { createBrowserClient } from '@supabase/ssr'
 import { FaEye, FaTrash, FaEdit, FaEllipsisV } from 'react-icons/fa'
 import { deleteReportWithFiles } from './ReportDeleteHandler'
@@ -15,6 +14,8 @@ export interface Report {
   title: string
   summary?: string | null
   pdf_url: string
+  file_url?: string | null
+  video_url?: string | null
   folder_id: string | null
   created_at: string
   folder_name?: string
@@ -180,18 +181,35 @@ export default function ReportCard({ report, onView, onDelete, isDraggable = tru
               
               {/* Actions */}
               <div className="flex space-x-2">
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    window.open(report.pdf_url, '_blank')
-                  }}
-                  className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
-                  title="Open PDF"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
-                </button>
+                {report.video_url && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      window.open(report.video_url!, '_blank')
+                    }}
+                    className="text-purple-600 hover:text-purple-800 p-1 rounded-full hover:bg-purple-50"
+                    title="Watch Video"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </button>
+                )}
+                {report.pdf_url && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      window.open(report.pdf_url, '_blank')
+                    }}
+                    className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                    title="View PDF"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </button>
+                )}
                 <button 
                   onClick={handleDelete} 
                   disabled={isDeleting}

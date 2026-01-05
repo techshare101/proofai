@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from 'react'
 import supabase from '@/lib/supabase'
 import { deleteFolder } from '../../../supabase/deleteFolder'
 import DroppableFolder from './DroppableFolder'
+import Link from 'next/link'
 
 interface Folder {
   id: string
@@ -13,9 +14,10 @@ interface FolderSidebarProps {
   userId: string | undefined
   onReportDrop?: (reportId: string, folderId: string) => Promise<void>
   className?: string
+  canUseFolders?: boolean
 }
 
-export default function FolderSidebar({ userId, onReportDrop, className = '' }: FolderSidebarProps) {
+export default function FolderSidebar({ userId, onReportDrop, className = '', canUseFolders = true }: FolderSidebarProps) {
   const [folders, setFolders] = useState<Folder[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -151,7 +153,17 @@ export default function FolderSidebar({ userId, onReportDrop, className = '' }: 
       
       {/* New folder input */}
       <div>
-        {isCreating ? (
+        {!canUseFolders ? (
+          <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <p className="text-sm text-gray-600 mb-2">Folders require Community plan or higher</p>
+            <Link 
+              href="/#pricing"
+              className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
+            >
+              Upgrade to unlock
+            </Link>
+          </div>
+        ) : isCreating ? (
           <div className="flex flex-col space-y-2">
             <input
               type="text"
