@@ -11,6 +11,7 @@ export default function CheckoutSuccessPage() {
   const sessionId = searchParams.get('session_id');
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [countdown, setCountdown] = useState(5);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -20,24 +21,35 @@ export default function CheckoutSuccessPage() {
       );
       
       const { data: { session } } = await supabase.auth.getSession();
+      setIsAuthenticated(!!session);
       
-      if (!session) {
-        // Not authenticated - redirect to login
-        console.log('No session found after checkout, redirecting to login');
-        router.push('/login');
-        return;
-      }
-      
-      setIsAuthenticated(true);
-      
-      // Give webhook time to process
+      // Give webhook time to process, then show success
       setTimeout(() => {
         setIsLoading(false);
       }, 2000);
     };
     
     checkAuth();
-  }, [router]);
+  }, []);
+
+  // Auto-redirect countdown after loading completes
+  useEffect(() => {
+    if (isLoading) return;
+    
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          // Redirect to dashboard if authenticated, otherwise to login
+          router.push(isAuthenticated ? '/dashboard' : '/login');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, [isLoading, isAuthenticated, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -45,7 +57,7 @@ export default function CheckoutSuccessPage() {
         {isLoading ? (
           <>
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <h1 className="text-xl font-semibold text-gray-900">Processing your subscription...</h1>
+            <h1 className="text-xl font-semibold text-gray-900">Processing your payment...</h1>
             <p className="text-gray-600 mt-2">Please wait while we activate your account.</p>
           </>
         ) : (
@@ -56,14 +68,17 @@ export default function CheckoutSuccessPage() {
               </svg>
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h1>
-            <p className="text-gray-600 mb-6">
+            <p className="text-gray-600 mb-4">
               Thank you for subscribing to ProofAI. Your account has been upgraded and you now have access to all premium features.
             </p>
+            <p className="text-sm text-gray-500 mb-6">
+              Redirecting to {isAuthenticated ? 'dashboard' : 'login'} in {countdown} seconds...
+            </p>
             <Link
-              href="/dashboard"
+              href={isAuthenticated ? '/dashboard' : '/login'}
               className="inline-block w-full px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition"
             >
-              Go to Dashboard
+              {isAuthenticated ? 'Go to Dashboard' : 'Sign In to Continue'}
             </Link>
             <Link
               href="/recorder"
