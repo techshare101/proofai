@@ -14,7 +14,7 @@ const DEFAULT_PLAN: UserPlan = {
     maxFileSizeMB: 25,
     videoQuality: 'standard',
     pdfExport: true,
-    folders: false,
+    folders: true, // Allow folders for all users
     watermark: true,
     aiSummary: false,
     customBranding: false,
