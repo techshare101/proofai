@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Report } from './ReportCard'
+import { Report, Folder } from './ReportCard'
 import ReportCard from './ReportCard'
 import { HiChevronDown, HiChevronRight, HiOutlineDocumentAdd } from 'react-icons/hi'
 import { motion, AnimatePresence, useSpring } from 'framer-motion'
@@ -10,6 +10,8 @@ interface FolderGroupedReportsProps {
   reports: Report[]
   onViewReport: (report: Report) => void
   onDeleteReport: (reportId: string) => void
+  onMoveReport?: (reportId: string, folderId: string | null) => void
+  folders?: Folder[]
 }
 
 interface FolderGroup {
@@ -22,7 +24,9 @@ interface FolderGroup {
 export default function FolderGroupedReports({ 
   reports, 
   onViewReport, 
-  onDeleteReport 
+  onDeleteReport,
+  onMoveReport,
+  folders = []
 }: FolderGroupedReportsProps) {
   // Group reports by folder
   const initialGroups = groupReportsByFolder(reports)
@@ -213,6 +217,8 @@ export default function FolderGroupedReports({
                       report={report}
                       onView={onViewReport}
                       onDelete={onDeleteReport}
+                      onMove={onMoveReport}
+                      folders={folders}
                     />
                   </motion.div>
                 ))}

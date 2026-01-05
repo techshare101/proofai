@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { deleteReportWithFiles } from './ReportDeleteHandler'
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
@@ -15,6 +15,11 @@ export interface Report {
   folder_id: string | null
   created_at: string
   folder_name?: string
+}
+
+export interface Folder {
+  id: string
+  name: string
 }
 
 // Format date as "M/D/YYYY, h:mm:ss AM/PM"
@@ -35,12 +40,26 @@ interface ReportCardProps {
   report: Report
   onView: (report: Report) => void
   onDelete: (reportId: string) => void
-  onMove?: (reportId: string) => void
+  onMove?: (reportId: string, folderId: string | null) => void
+  folders?: Folder[]
   isDraggable?: boolean
 }
 
-export default function ReportCard({ report, onView, onDelete, onMove, isDraggable = true }: ReportCardProps) {
+export default function ReportCard({ report, onView, onDelete, onMove, folders = [], isDraggable = true }: ReportCardProps) {
   const [isDeleting, setIsDeleting] = useState(false)
+  const [showMoveDropdown, setShowMoveDropdown] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowMoveDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
   
   // Set up draggable functionality
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -159,21 +178,69 @@ export default function ReportCard({ report, onView, onDelete, onMove, isDraggab
           Delete
         </button>
         
-        {/* Move Button */}
-        <button 
-          onClick={(e) => {
-            e.stopPropagation()
-            if (onMove) {
-              onMove(report.id)
-            }
-          }}
-          className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-lg border text-orange-600 border-orange-200 bg-orange-50 hover:bg-orange-100"
-        >
-          <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-          </svg>
-          Move
-        </button>
+        {/* Move Button with Dropdown */}
+        <div className="relative" ref={dropdownRef}>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowMoveDropdown(!showMoveDropdown)
+            }}
+            className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-lg border text-orange-600 border-orange-200 bg-orange-50 hover:bg-orange-100"
+          >
+            <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+            Move
+            <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          
+          {/* Folder Dropdown */}
+          {showMoveDropdown && (
+            <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
+              <div className="py-1">
+                {/* Uncategorized option */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (onMove) {
+                      onMove(report.id, null)
+                    }
+                    setShowMoveDropdown(false)
+                  }}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
+                    report.folder_id === null ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                  }`}
+                >
+                  📁 Uncategorized
+                </button>
+                
+                {folders.length === 0 ? (
+                  <p className="px-4 py-2 text-sm text-gray-500 italic">No folders yet</p>
+                ) : (
+                  folders.map((folder) => (
+                    <button
+                      key={folder.id}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (onMove) {
+                          onMove(report.id, folder.id)
+                        }
+                        setShowMoveDropdown(false)
+                      }}
+                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
+                        report.folder_id === folder.id ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                      }`}
+                    >
+                      📁 {folder.name}
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
