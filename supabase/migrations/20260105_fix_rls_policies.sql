@@ -19,6 +19,7 @@ USING (auth.uid() = user_id);
 
 -- Also ensure folders have proper RLS
 DROP POLICY IF EXISTS "Users can insert their own folders" ON public.folders;
+DROP POLICY IF EXISTS "Users can read their own folders" ON public.folders;
 DROP POLICY IF EXISTS "Users can delete their own folders" ON public.folders;
 DROP POLICY IF EXISTS "Users can update their own folders" ON public.folders;
 
@@ -27,6 +28,12 @@ CREATE POLICY "Users can insert their own folders"
 ON public.folders
 FOR INSERT
 WITH CHECK (auth.uid() = user_id);
+
+-- Allow users to read their own folders
+CREATE POLICY "Users can read their own folders"
+ON public.folders
+FOR SELECT
+USING (auth.uid() = user_id);
 
 -- Allow users to delete their own folders
 CREATE POLICY "Users can delete their own folders"
