@@ -25,8 +25,9 @@ export default function ReportList({ folderId }: { folderId: string }) {
           <h3 className="font-bold text-lg">{report.title}</h3>
           <p className="text-sm text-gray-600">{report.summary}</p>
           <a
-            href={report.report_url}
+            href={report.pdf_url || report.report_url}
             target="_blank"
+            rel="noopener noreferrer"
             className="text-blue-600 underline text-sm"
           >
             View PDF
