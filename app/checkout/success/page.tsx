@@ -1,22 +1,43 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { createBrowserClient } from '@supabase/ssr';
 
 export default function CheckoutSuccessPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const sessionId = searchParams.get('session_id');
   const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    // Give webhook time to process
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 2000);
-
-    return () => clearTimeout(timer);
-  }, []);
+    const checkAuth = async () => {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        // Not authenticated - redirect to login
+        console.log('No session found after checkout, redirecting to login');
+        router.push('/login');
+        return;
+      }
+      
+      setIsAuthenticated(true);
+      
+      // Give webhook time to process
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 2000);
+    };
+    
+    checkAuth();
+  }, [router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">

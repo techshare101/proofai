@@ -5,7 +5,22 @@ import { createClient } from '@supabase/supabase-js';
 // Check for required environment variables
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://proofai-app.vercel.app';
+
+// Get APP_URL from environment or use production URL
+const getAppUrl = (request: NextRequest) => {
+  // First try environment variable
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL;
+  }
+  // Fall back to request origin
+  const host = request.headers.get('host');
+  const protocol = request.headers.get('x-forwarded-proto') || 'https';
+  if (host) {
+    return `${protocol}://${host}`;
+  }
+  // Last resort fallback
+  return 'https://proofai-prod.vercel.app';
+};
 
 // Map plan types to Stripe price IDs
 const PLAN_TO_PRICE: Record<string, string | undefined> = {
@@ -84,6 +99,9 @@ export async function POST(request: NextRequest) {
 
     // Determine if this is a one-time payment (emergency pack) or subscription
     const isOneTime = planType === 'emergency_pack';
+    
+    // Get the app URL dynamically
+    const appUrl = getAppUrl(request);
 
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
@@ -96,8 +114,8 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: isOneTime ? 'payment' : 'subscription',
-      success_url: `${APP_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${APP_URL}/checkout/cancel`,
+      success_url: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appUrl}/checkout/cancel`,
       metadata: {
         userId,
         planType,
