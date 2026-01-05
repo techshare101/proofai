@@ -507,172 +507,158 @@ export async function generatePolishedPDF(options: PolishedPDFInput): Promise<Bl
     addSectionDivider();
   }
   
-  // Add QR code for video URL if available
+  // ============================================
+  // FINAL VERIFICATION PAGE - QR Code & Signature
+  // ============================================
+  // Add a dedicated final page for verification artifacts
+  // This keeps the report content clean and professional
+  
+  doc.addPage();
+  let verifyY = margin;
+  
+  // Page header
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(0, 0, 0);
+  doc.text('VERIFICATION & EVIDENCE ACCESS', margin, verifyY);
+  verifyY += lineHeight * 2;
+  
+  // Divider line
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(1);
+  doc.line(margin, verifyY, pageWidth - margin, verifyY);
+  verifyY += lineHeight * 1.5;
+  
+  // Case ID section
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(12);
+  doc.text(`Case ID: ${options.caseId || 'Unknown'}`, margin, verifyY);
+  verifyY += lineHeight;
+  
+  // Timestamp
+  const timestamp = new Date().toISOString();
+  doc.text(`Generated: ${timestamp}`, margin, verifyY);
+  verifyY += lineHeight * 2;
+  
+  // QR Code for video evidence (if available)
   if (options.videoUrl) {
     try {
-      // Create a branded visual CTA block with green background
+      // Green branded block for video QR
+      const blockWidth = 380;
+      const blockHeight = 280;
+      const blockX = (pageWidth - blockWidth) / 2;
+      const blockY = verifyY;
       
-      // First, ensure we have enough space for the CTA block
-      const ctaBlockHeight = 200; // Height of the entire CTA block
-      
-      // Add a new page if needed to ensure enough space
-      if (yPos + ctaBlockHeight > pageHeight - margin) {
-        doc.addPage();
-        yPos = margin + 20; // Start slightly lower on the new page
-      } else {
-        yPos += lineHeight * 2; // Add spacing before the CTA block
-      }
-      
-      // COMPLETE REDESIGN OF QR SECTION - VERTICAL LAYOUT WITH CLEAR SEPARATION
-      
-      // Calculate block dimensions - using vertical layout with more height
-      const blockWidth = 400; // Width of the green block
-      const blockHeight = 320; // Increased height to prevent overlap (from 280px)
-      const blockX = (pageWidth - blockWidth) / 2; // Center horizontally
-      const blockY = yPos;
-      
-      // Draw green background rectangle
-      doc.setFillColor(39, 174, 96); // Green color (#27AE60)
+      // Draw green background
+      doc.setFillColor(39, 174, 96); // Green (#27AE60)
       doc.rect(blockX, blockY, blockWidth, blockHeight, 'F');
       
-      // TEXT SECTION - All text at the top of the block
-      // Set up text styles
-      doc.setTextColor(255, 255, 255); // White text
+      // Title
+      doc.setTextColor(255, 255, 255);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(20); // Larger text
-      
-      // Add the title centered at the top with more space
+      doc.setFontSize(18);
       const title = 'SCAN TO WATCH EVIDENCE';
-      const titleWidth = doc.getStringUnitWidth(title) * 20 / doc.internal.scaleFactor;
-      const titleX = blockX + (blockWidth - titleWidth) / 2;
-      const titleY = blockY + 35; // Good space from top
-      doc.text(title, titleX, titleY);
+      const titleWidth = doc.getStringUnitWidth(title) * 18 / doc.internal.scaleFactor;
+      doc.text(title, blockX + (blockWidth - titleWidth) / 2, blockY + 35);
       
-      // Add the subtitle with case ID
-      const caseId = options.caseId || 'unknown';
-      const friendlyUrl = `proof.ai/case/${caseId}`;
-      doc.setFontSize(14);
+      // Subtitle
+      doc.setFontSize(12);
       doc.setFont('helvetica', 'normal');
-      const subtitleText = 'Or visit:';
-      const subtitleWidth = doc.getStringUnitWidth(subtitleText) * 14 / doc.internal.scaleFactor;
-      const subtitleX = blockX + (blockWidth - subtitleWidth - doc.getStringUnitWidth(friendlyUrl) * 14 / doc.internal.scaleFactor - 5) / 2;
-      const subtitleY = titleY + 30;
-      doc.text(subtitleText, subtitleX, subtitleY);
+      const friendlyUrl = `proof.ai/case/${options.caseId || 'unknown'}`;
+      const subtitleText = `Or visit: ${friendlyUrl}`;
+      const subtitleWidth = doc.getStringUnitWidth(subtitleText) * 12 / doc.internal.scaleFactor;
+      doc.text(subtitleText, blockX + (blockWidth - subtitleWidth) / 2, blockY + 55);
       
-      // Add the URL beside "Or visit:"
-      doc.setFont('helvetica', 'bold');
-      doc.text(friendlyUrl, subtitleX + subtitleWidth + 5, subtitleY);
+      // QR Code with white background
+      const qrSize = 150;
+      const qrPadding = 20;
+      const qrBgSize = qrSize + (qrPadding * 2);
+      const qrBgX = blockX + (blockWidth - qrBgSize) / 2;
+      const qrBgY = blockY + 75;
       
-      // QR CODE SECTION - Positioned below text with proper spacing
-      // Create white background for QR code with extra generous quiet zone
-      const qrPadding = 25; // Slightly adjusted padding (from 30px)
-      const qrSize = 160; // Slightly reduced size (from 180px) but still larger than original
-      const qrBackgroundSize = qrSize + (qrPadding * 2); // QR size + padding on each side
-      
-      // Calculate position for QR below the text with fixed spacing
-      // This ensures no overlap while maintaining scannability
-      const qrVerticalOffset = 80; // Fixed space below subtitle
-      const qrBackgroundX = blockX + (blockWidth - qrBackgroundSize) / 2; // Horizontally centered
-      const qrBackgroundY = subtitleY + qrVerticalOffset; // Fixed position below text
-      
-      // Draw white background for QR (larger with more padding)
       doc.setFillColor(255, 255, 255);
-      doc.rect(qrBackgroundX, qrBackgroundY, qrBackgroundSize, qrBackgroundSize, 'F');
+      doc.rect(qrBgX, qrBgY, qrBgSize, qrBgSize, 'F');
       
-      // Create QR code matching the screenshot style:
-      // - Medium error correction for balance of error correction and block size
-      // - Sharp edges and distinct blocks
-      // - Clean, classic QR pattern
+      // Generate and add QR code
       const qrCodeDataURL = await QRCode.toDataURL(options.videoUrl, {
-        errorCorrectionLevel: 'M', // Medium error correction for balance
-        margin: 2, // Smaller margin to match screenshot style
-        width: qrSize, // Maintained large size
-        rendererOpts: {
-          quality: 1.0, // Maximum quality
-        },
-        scale: 8, // Increase scale for sharper edges
-        color: {
-          dark: '#000000', // Pure black
-          light: '#ffffff', // Pure white
-        },
+        errorCorrectionLevel: 'M',
+        margin: 2,
+        width: qrSize,
+        color: { dark: '#000000', light: '#ffffff' },
       });
       
-      // Add the QR code centered in the white background
-      const qrX = qrBackgroundX + qrPadding;
-      const qrY = qrBackgroundY + qrPadding;
-      doc.addImage(qrCodeDataURL, 'PNG', qrX, qrY, qrSize, qrSize);
+      doc.addImage(qrCodeDataURL, 'PNG', qrBgX + qrPadding, qrBgY + qrPadding, qrSize, qrSize);
       
-      // Update yPos to the end of the block
-      yPos += blockHeight + lineHeight * 2;
-      
-      // Reset text color for rest of document
+      verifyY = blockY + blockHeight + lineHeight * 2;
       doc.setTextColor(0, 0, 0);
     } catch (error) {
-      // Handle any errors in QR code generation
-      doc.setTextColor(0, 0, 0); // Reset text color
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(12);
-      doc.text('Error generating QR code for video evidence.', margin, yPos);
-      yPos += lineHeight;
-      
-      // Display the URL as text in case QR code fails
-      if (options.videoUrl) {
-        doc.text(`Video URL: ${options.videoUrl}`, margin, yPos);
-      }
-      
       console.error('QR code generation failed:', error);
+      doc.setTextColor(0, 0, 0);
+      doc.text(`Video Evidence URL: ${options.videoUrl}`, margin, verifyY);
+      verifyY += lineHeight * 2;
     }
   }
   
-  // Navigate to the last page for adding the signature and verification QR code
-  doc.setPage(doc.getNumberOfPages());
-  
-  // Add digital signature placeholder if includeSignature is true
+  // Digital signature placeholder
   if (options.includeSignature) {
-    const signatureY = pageHeight - 80;
+    verifyY += lineHeight;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('AUTHORIZED SIGNATURE', margin, verifyY);
+    verifyY += lineHeight * 1.5;
     
-    // Add signature line
+    // Signature line
     doc.setDrawColor(0);
-    doc.line(60, signatureY, 260, signatureY);
+    doc.setLineWidth(0.5);
+    doc.line(margin, verifyY, margin + 200, verifyY);
     
-    // Add signature text
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    doc.text('Authorized Signature', 60, signatureY + 15);
+    doc.text('Signature', margin, verifyY + 15);
+    doc.text('Date: _______________', margin + 220, verifyY);
+    verifyY += lineHeight * 3;
   }
   
-  // Add verification QR code if reportPublicUrl is available
+  // Verification QR code (smaller, bottom section)
   if (options.reportPublicUrl) {
     try {
-      // Set position for QR code (bottom-right corner)
-      const qrSize = 80;
-      const qrX = pageWidth - 100; // 100px from right edge
-      const qrY = pageHeight - 40 - qrSize; // 40px from bottom edge
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text('DOCUMENT VERIFICATION', margin, verifyY);
+      verifyY += lineHeight;
       
-      // Generate QR code with high error correction
-      const qrCodeDataURL = await QRCode.toDataURL(options.reportPublicUrl, {
-        errorCorrectionLevel: 'H', // Highest error correction
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.text('Scan to verify this document\'s authenticity:', margin, verifyY);
+      verifyY += lineHeight * 1.5;
+      
+      const verifyQrSize = 80;
+      const verifyQrDataURL = await QRCode.toDataURL(options.reportPublicUrl, {
+        errorCorrectionLevel: 'H',
         margin: 1,
-        width: qrSize,
-        color: {
-          dark: '#000000',
-          light: '#ffffff',
-        },
+        width: verifyQrSize,
+        color: { dark: '#000000', light: '#ffffff' },
       });
       
-      // Add the QR code to the PDF
-      doc.addImage(qrCodeDataURL, 'PNG', qrX, qrY, qrSize, qrSize);
+      doc.addImage(verifyQrDataURL, 'PNG', margin, verifyY, verifyQrSize, verifyQrSize);
       
-      // Add verification caption
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      const captionText = 'Verify at www.proof.ai';
-      const captionWidth = doc.getStringUnitWidth(captionText) * 8 / doc.internal.scaleFactor;
-      doc.text(captionText, qrX + (qrSize - captionWidth) / 2, qrY + qrSize + 10);
+      // Verification text beside QR
+      doc.setFontSize(9);
+      doc.text('Verify at: www.proof.ai', margin + verifyQrSize + 15, verifyY + 20);
+      doc.text(`Report ID: ${options.caseId || 'Unknown'}`, margin + verifyQrSize + 15, verifyY + 35);
+      doc.text('This document is timestamped and immutable.', margin + verifyQrSize + 15, verifyY + 50);
     } catch (error) {
       console.error('Verification QR code generation failed:', error);
     }
   }
+  
+  // Legal disclaimer at bottom
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(8);
+  doc.setTextColor(100, 100, 100);
+  const disclaimer = 'This document was generated by ProofAI and serves as a record of the recorded evidence. The QR codes above provide direct access to the original video evidence and document verification.';
+  const disclaimerLines = doc.splitTextToSize(disclaimer, contentWidth);
+  doc.text(disclaimerLines, margin, pageHeight - 60);
   
   // Add page numbers to all pages
   addPageNumber();

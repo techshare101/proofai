@@ -62,8 +62,6 @@ export default function FolderSidebar({ userId, onReportDrop, className = '', ca
     if (!newFolderName.trim() || !userId) return
     
     try {
-      setIsCreating(true)
-      
       const { data, error } = await supabase
         .from('folders')
         .insert([
@@ -74,8 +72,8 @@ export default function FolderSidebar({ userId, onReportDrop, className = '', ca
       
       if (error) throw error
       
-      // Add the new folder to the list
-      setFolders([...folders, data])
+      // Refetch all folders to ensure consistency
+      await fetchFolders()
       setNewFolderName('')
       setIsCreating(false)
       
