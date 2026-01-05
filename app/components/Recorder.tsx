@@ -263,22 +263,40 @@ export default function Recorder() {
         let location = 'Unknown Location';
         try {
           if ('geolocation' in navigator) {
+            console.log('📍 Requesting geolocation...');
             const position = await new Promise<GeolocationPosition>((res, rej) =>
-              navigator.geolocation.getCurrentPosition(res, rej)
+              navigator.geolocation.getCurrentPosition(res, rej, {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 60000
+              })
             );
+            console.log(`📍 Got coordinates: ${position.coords.latitude}, ${position.coords.longitude}`);
+            
             const key = process.env.NEXT_PUBLIC_OPENCAGE_API_KEY;
             if (key) {
+              console.log('📍 Geocoding with OpenCage...');
               const response = await fetch(
                 `https://api.opencagedata.com/geocode/v1/json?q=${position.coords.latitude}+${position.coords.longitude}&key=${key}`
               );
               const data = await response.json();
               if (data?.results?.length > 0) {
                 location = data.results[0].formatted;
+                console.log(`📍 Geocoded location: ${location}`);
+              } else {
+                console.warn('📍 OpenCage returned no results');
+                location = `Lat: ${position.coords.latitude.toFixed(6)}, Lng: ${position.coords.longitude.toFixed(6)}`;
               }
+            } else {
+              console.warn('📍 No OpenCage API key - using coordinates');
+              location = `Lat: ${position.coords.latitude.toFixed(6)}, Lng: ${position.coords.longitude.toFixed(6)}`;
             }
+          } else {
+            console.warn('📍 Geolocation not available in browser');
           }
-        } catch (e) {
-          console.warn('Geolocation failed:', e);
+        } catch (e: any) {
+          console.warn('📍 Geolocation failed:', e?.message || e);
+          // Don't leave as Unknown - at least indicate we tried
         }
 
         const result = await uploadRecording(blob, location);
