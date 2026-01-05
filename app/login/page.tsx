@@ -29,9 +29,13 @@ export default function LoginPage() {
       setGoogleLoading(true)
       setError('')
       
-      const redirectUrl = typeof window !== 'undefined' 
-        ? `${window.location.origin}/auth/callback`
-        : 'https://proofai-app.vercel.app/auth/callback'
+      // Use environment variable or current origin for redirect
+      // IMPORTANT: This URL must also be configured in Supabase Auth settings
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
+        (typeof window !== 'undefined' ? window.location.origin : 'https://proofai-prod.vercel.app')
+      const redirectUrl = `${baseUrl}/auth/callback`
+      
+      console.log('🔐 Google OAuth redirect URL:', redirectUrl)
       
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',

@@ -46,9 +46,11 @@ export default function DashboardPage() {
 
   // Fetch reports and folders when session changes
   useEffect(() => {
-    if (session?.user && !activeFolder) {
-      fetchReports()
-      fetchFolders()
+    if (session?.user) {
+      fetchFolders() // Always fetch folders
+      if (!activeFolder) {
+        fetchReports()
+      }
     }
   }, [session, activeFolder])
   
@@ -57,13 +59,18 @@ export default function DashboardPage() {
     if (!session?.user?.id) return
     
     try {
+      console.log('📁 Fetching folders for user:', session.user.id)
       const { data, error } = await supabase
         .from('folders')
         .select('id, name')
         .eq('user_id', session.user.id)
         .order('name')
       
-      if (error) throw error
+      if (error) {
+        console.error('❌ Error fetching folders:', error)
+        throw error
+      }
+      console.log('📁 Folders fetched:', data)
       setFolders(data || [])
     } catch (err) {
       console.error('Error fetching folders:', err)
