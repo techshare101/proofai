@@ -172,7 +172,7 @@ export default function FolderSidebar({ userId, onReportDrop, className = '', ca
           <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
             <p className="text-sm text-gray-600 mb-2">Folders require Community plan or higher</p>
             <Link 
-              href="/#pricing"
+              href="/pricing"
               className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
             >
               Upgrade to unlock

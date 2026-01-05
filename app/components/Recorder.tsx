@@ -428,7 +428,7 @@ export default function Recorder() {
               </span>
               {!canRecord && (
                 <Link 
-                  href="/#pricing" 
+                  href="/pricing" 
                   className="ml-2 px-3 py-1 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition"
                 >
                   Upgrade

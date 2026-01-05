@@ -16,7 +16,7 @@ export default function CheckoutCancelPage() {
           Your payment was cancelled. No charges were made to your account. You can try again whenever you're ready.
         </p>
         <Link
-          href="/#pricing"
+          href="/pricing"
           className="inline-block w-full px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition"
         >
           View Plans

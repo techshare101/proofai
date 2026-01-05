@@ -305,7 +305,7 @@ export default function DashboardPage() {
             {/* Upgrade CTA for free users */}
             {!isPro && !isDevBypass && (
               <Link 
-                href="/#pricing"
+                href="/pricing"
                 className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
               >
                 Upgrade
