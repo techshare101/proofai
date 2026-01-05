@@ -121,11 +121,11 @@ export default function Recorder() {
   // Camera toggle functionality
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user")
   
-  // Recording time tracking
+  // Recording time tracking with hard stop
   const [recordingTime, setRecordingTime] = useState(0)
+  const [remainingTime, setRemainingTime] = useState(300) // 5 min default
   const recordingTimer = useRef<NodeJS.Timeout | null>(null)
-  // Remove fixed time limit to allow extended recording
-  // Browser memory limits will naturally constrain maximum recording time
+  const MAX_RECORDING_SECONDS = 300 // 5 minutes hard limit
 
   // Toggle between front and back cameras
   const toggleCamera = () => {
@@ -260,26 +260,44 @@ export default function Recorder() {
     }
 
     try {
-      // Reset recording time
+      // Reset recording time and remaining time
       setRecordingTime(0);
+      setRemainingTime(MAX_RECORDING_SECONDS);
       
-      // Setup recording timer
+      // Setup recording timer with hard stop
       if (recordingTimer.current) {
         clearInterval(recordingTimer.current);
       }
       
-      // Set up a timer to track recording duration without enforcing a limit
+      // Accurate timer with hard stop at limit
       recordingTimer.current = setInterval(() => {
-        setRecordingTime(prevTime => prevTime + 1);
+        setRecordingTime(prevTime => {
+          const nextTime = prevTime + 1;
+          const remaining = Math.max(MAX_RECORDING_SECONDS - nextTime, 0);
+          setRemainingTime(remaining);
+          
+          // Hard stop at limit
+          if (remaining <= 0) {
+            console.log('⏱️ Recording time limit reached - auto-stopping');
+            stopRecording();
+          }
+          
+          return nextTime;
+        });
       }, 1000);
 
       setStatus('recording');
+      
+      // Optimized MediaRecorder with bitrate control for smaller files
       const recorder = new MediaRecorder(stream, {
-        mimeType: 'video/webm;codecs=vp8,opus'
+        mimeType: 'video/webm;codecs=vp8,opus',
+        videoBitsPerSecond: 1_500_000,  // 1.5 Mbps - good quality, smaller files
+        audioBitsPerSecond: 128_000     // 128 kbps - clear audio for transcription
       });
 
       chunks.current = [];
 
+      // Chunked recording - emits data every 5 seconds for memory efficiency
       recorder.ondataavailable = e => {
         if (e.data.size > 0) chunks.current.push(e.data);
       };
@@ -388,7 +406,8 @@ export default function Recorder() {
         setStatus('ready');
       };
 
-      recorder.start(1000);
+      // Start with 5-second chunks for memory efficiency
+      recorder.start(5000);
       setMediaRecorder(recorder);
       setRecording(true);
       setError('');
@@ -493,7 +512,7 @@ export default function Recorder() {
           </div>
         )}
 
-        <StatusMessage status={status} error={error} recordingTime={recording ? recordingTime : undefined} maxRecordingTime={300} />
+        <StatusMessage status={status} error={error} recordingTime={recording ? recordingTime : undefined} maxRecordingTime={MAX_RECORDING_SECONDS} />
 
         {/* Advanced Settings Button */}
         <div className="mt-2">
