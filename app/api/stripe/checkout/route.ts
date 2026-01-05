@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 // Check for required environment variables
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://proofai.vercel.app';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://proofai-app.vercel.app';
 
 // Map plan types to Stripe price IDs
 const PLAN_TO_PRICE: Record<string, string | undefined> = {
