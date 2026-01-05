@@ -13,7 +13,7 @@ import Link from 'next/link';
 
 type RecorderStatus = 'idle' | 'requesting' | 'ready' | 'recording' | 'uploading' | 'error';
 
-const StatusMessage = ({ status, error, recordingTime }: { status: RecorderStatus; error?: string; recordingTime?: number }) => {
+const StatusMessage = ({ status, error, recordingTime, maxRecordingTime = 300 }: { status: RecorderStatus; error?: string; recordingTime?: number; maxRecordingTime?: number }) => {
   // Format seconds to MM:SS
   function formatTime(seconds: number): string {
     const minutes = Math.floor(seconds / 60);
@@ -32,8 +32,33 @@ const StatusMessage = ({ status, error, recordingTime }: { status: RecorderStatu
 
   const isError = status === 'error';
   
+  // Calculate progress and color for recording bar
+  const getProgressInfo = () => {
+    if (recordingTime === undefined) return { percent: 0, color: 'bg-green-500', textColor: 'text-gray-700' };
+    
+    const percentUsed = Math.min((recordingTime / maxRecordingTime) * 100, 100);
+    const percentRemaining = 100 - percentUsed;
+    
+    // Color thresholds: Green > 30%, Yellow 10-30%, Red < 10%
+    let color = 'bg-green-500';
+    let textColor = 'text-gray-700';
+    
+    if (percentRemaining <= 10) {
+      color = 'bg-red-500';
+      textColor = 'text-red-600 font-semibold';
+    } else if (percentRemaining <= 30) {
+      color = 'bg-yellow-500';
+      textColor = 'text-yellow-600';
+    }
+    
+    return { percent: percentUsed, color, textColor, percentRemaining };
+  };
+  
+  const progressInfo = getProgressInfo();
+  const remainingSeconds = maxRecordingTime - (recordingTime || 0);
+  
   return (
-    <div className="text-center">
+    <div className="text-center w-full max-w-md">
       {isError ? (
         <p className="text-red-500">{messages[status]}</p>
       ) : (
@@ -41,8 +66,31 @@ const StatusMessage = ({ status, error, recordingTime }: { status: RecorderStatu
       )}
       
       {recordingTime !== undefined && status === 'recording' && (
-        <div className="text-lg font-bold text-center mt-2">
-          Recording Time: {formatTime(recordingTime)}
+        <div className="mt-3 space-y-2">
+          {/* Recording time display */}
+          <div className="flex justify-between items-center text-sm">
+            <span className={progressInfo.textColor}>
+              Recording: {formatTime(recordingTime)}
+            </span>
+            <span className={progressInfo.textColor}>
+              {remainingSeconds > 0 ? `${formatTime(remainingSeconds)} remaining` : 'Time limit reached'}
+            </span>
+          </div>
+          
+          {/* Progress bar with color transitions */}
+          <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+            <div
+              className={`h-full transition-all duration-300 ${progressInfo.color}`}
+              style={{ width: `${progressInfo.percent}%` }}
+            />
+          </div>
+          
+          {/* Warning message when time is running low */}
+          {progressInfo.percentRemaining <= 10 && remainingSeconds > 0 && (
+            <p className="text-red-500 text-sm font-medium animate-pulse">
+              ⚠️ Recording will auto-stop soon!
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -445,7 +493,7 @@ export default function Recorder() {
           </div>
         )}
 
-        <StatusMessage status={status} error={error} recordingTime={recording ? recordingTime : undefined} />
+        <StatusMessage status={status} error={error} recordingTime={recording ? recordingTime : undefined} maxRecordingTime={300} />
 
         {/* Advanced Settings Button */}
         <div className="mt-2">
