@@ -95,9 +95,20 @@ export class TranscriptionService {
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        let error;
+        const responseText = await response.text();
+        console.error('❌ Transcription API raw response:', responseText);
+        console.error('❌ Transcription API status:', response.status, response.statusText);
+        
+        try {
+          error = JSON.parse(responseText);
+        } catch {
+          error = { message: responseText || `HTTP ${response.status}: ${response.statusText}` };
+        }
+        
         console.error('❌ Transcription API error detail:', error);
-        throw new Error(`Transcription failed: ${error?.error?.message || JSON.stringify(error)}`);
+        const errorMessage = error?.error?.message || error?.details || error?.message || `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(`Transcription failed: ${errorMessage}`);
       }
 
       const responseData = await response.json();

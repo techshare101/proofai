@@ -93,10 +93,25 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `OpenAI API error: ${openaiError.message}` }, { status: 500 });
     }
 
-    const result = await openaiRes.json();
+    const resultText = await openaiRes.text();
+    let result;
+    try {
+      result = JSON.parse(resultText);
+    } catch {
+      console.error("❌ OpenAI returned non-JSON response:", resultText);
+      return NextResponse.json({ 
+        error: "OpenAI returned invalid response", 
+        details: resultText.substring(0, 500) 
+      }, { status: 500 });
+    }
+    
     if (!openaiRes.ok) {
       console.error("❌ OpenAI Whisper Error:", result);
-      return NextResponse.json(result, { status: 500 });
+      return NextResponse.json({ 
+        error: result?.error?.message || "OpenAI transcription failed",
+        details: JSON.stringify(result),
+        openaiStatus: openaiRes.status
+      }, { status: 500 });
     }
 
     console.log("✅ Transcription successful");
