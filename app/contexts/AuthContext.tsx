@@ -22,26 +22,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   // Initialize auth and handle session changes
+  // Hardened: prevents duplicate listeners, stale state, and auth loss during upload
   useEffect(() => {
-    const getSession = async () => {
+    let mounted = true;
+
+    async function init() {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) throw error;
-        setSession(session);
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (!mounted) return;
+        
+        if (error) {
+          console.error('Session error:', error);
+        }
+        
+        if (data?.session) {
+          setSession(data.session);
+        }
       } catch (err) {
-        console.error('Session error:', err);
+        console.error('Session init error:', err);
       } finally {
-        setIsLoading(false);
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
+    }
+
+    init();
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (!mounted) return;
+        setSession(session);
+      }
+    );
+
+    return () => {
+      mounted = false;
+      listener?.subscription?.unsubscribe();
     };
-
-    getSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
   }, []);
 
   // Handle auth redirects
