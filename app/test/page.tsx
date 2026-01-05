@@ -4,8 +4,6 @@ import React, { useEffect, useState } from 'react';
 import supabase from '../lib/supabase';
 import LegalSummaryGenerator from '../components/LegalSummaryGenerator';
 import { generatePDF } from '../utils/generatePDF';
-import * as fs from 'fs';
-import * as path from 'path';
 
 export default function TestPage() {
   const [error, setError] = useState<string>();
@@ -28,46 +26,30 @@ export default function TestPage() {
     const testPdfGeneration = async () => {
       console.log('🔍 Starting PDF generation test...');
       try {
-        // Prepare test data
-        const mockData = {
-          summary: 'This is a test summary.',
-          participants: ['John Doe', 'Jane Smith'],
-          keyEvents: ['Event 1', 'Event 2'],
-          context: {
-            time: '2025-05-31 13:30:00',
-            location: 'Meeting Room A',
-            environmentalFactors: 'Normal office conditions'
-          },
-          notableQuotes: ['Quote 1', 'Quote 2'],
-          reportRelevance: {
-            legal: true,
-            hr: true,
-            safety: true,
-            explanation: 'This report has legal, HR, and safety implications'
-          },
-          videoUrl: 'https://example.com/video.mp4'
-        };
-
-        const mockOptions = {
+        // Prepare test data matching PdfRequest interface
+        const mockRequest = {
+          content: 'This is a test summary content for PDF generation.',
           caseId: 'TEST-001',
-          reviewedBy: 'Test Reviewer',
-          confidential: true
+          generatedBy: 'Test User',
+          options: {
+            watermark: false,
+            confidential: true,
+            includeSignature: true,
+            includeTimestamps: true,
+            includeFooter: true
+          }
         };
 
         // Log data before generation
-        console.log('🧾 Test Data:', JSON.stringify(mockData, null, 2));
-        console.log('📍 Context:', JSON.stringify(mockData.context, null, 2));
-        console.log('⚙️ Options:', JSON.stringify(mockOptions, null, 2));
-
-        // Check if reports directory exists
-        const reportsDir = path.join(process.cwd(), 'public/reports');
-        console.log('📂 Reports directory:', reportsDir);
-        console.log('📂 Directory exists:', fs.existsSync(reportsDir));
+        console.log('🧾 Test Request:', JSON.stringify(mockRequest, null, 2));
 
         // Generate PDF with try-catch
-        const resultPath = await generatePDF(mockData, mockOptions);
-        console.log('✅ PDF generated at:', resultPath);
-        setPdfUrl(resultPath);
+        const resultPath = await generatePDF(mockRequest);
+        console.log('✅ PDF generated:', resultPath);
+        // resultPath is Uint8Array, create blob URL for display
+        const blob = new Blob([resultPath as BlobPart], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        setPdfUrl(url);
       } catch (err) {
         console.error('❌ PDF generation error:', err);
         if (err instanceof Error) {
