@@ -173,6 +173,7 @@ export default function Recorder() {
   const [remainingTime, setRemainingTime] = useState(300) // 5 min default
   const recordingTimer = useRef<NodeJS.Timeout | null>(null)
   const currentBlobSize = useRef<number>(0) // Track current recording size
+  const elapsedSecondsRef = useRef<number>(0) // REF for authoritative time tracking (not state!)
   const MAX_RECORDING_SECONDS = 300 // 5 minutes hard limit
   
   /**
@@ -343,6 +344,7 @@ export default function Recorder() {
       // Reset recording time and remaining time
       setRecordingTime(0);
       setRemainingTime(MAX_RECORDING_SECONDS);
+      elapsedSecondsRef.current = 0; // Reset authoritative time tracker
       
       // Setup recording timer with hard stop
       if (recordingTimer.current) {
@@ -352,47 +354,71 @@ export default function Recorder() {
       // Reset blob size tracker
       currentBlobSize.current = 0;
       
-      // Accurate timer with hard stop at limit
+      /**
+       * 🛑 AUTHORITATIVE TIME TRACKING
+       * 
+       * We use a REF (elapsedSecondsRef) as the single source of truth,
+       * NOT React state. React state updates are batched and async,
+       * which can cause the hard stop to be delayed or skipped.
+       * 
+       * The ref is checked FIRST, OUTSIDE of any state setter.
+       */
       recordingTimer.current = setInterval(() => {
-        setRecordingTime(prevTime => {
-          const nextTime = prevTime + 1;
-          const remaining = Math.max(MAX_RECORDING_SECONDS - nextTime, 0);
-          setRemainingTime(remaining);
-          
-          // Hard stop at TIME limit
-          if (remaining <= 0) {
-            console.log('⏱️ Recording time limit reached - auto-stopping');
-            hardStopRecording('time');
-          }
-          
-          return nextTime;
-        });
+        // 1. Increment authoritative time counter (REF, not state)
+        elapsedSecondsRef.current += 1;
+        const elapsed = elapsedSecondsRef.current;
+        const remaining = Math.max(MAX_RECORDING_SECONDS - elapsed, 0);
+        
+        // 2. Update UI state (for display only - NOT authoritative)
+        setRecordingTime(elapsed);
+        setRemainingTime(remaining);
+        
+        // 3. 🛑 HARD STOP CHECK - uses REF, not state
+        if (elapsed >= MAX_RECORDING_SECONDS) {
+          console.log(`⏱️ TIME LIMIT REACHED: ${elapsed}s >= ${MAX_RECORDING_SECONDS}s - FORCING STOP`);
+          hardStopRecording('time');
+          return; // Exit interval callback immediately
+        }
       }, 1000);
 
       setStatus('recording');
       
-      // Optimized MediaRecorder with LOWER bitrate to prevent size overflow
-      // 800kbps video + 96kbps audio ≈ ~67MB/hour = ~5.6MB per 5 min (safe for 25MB limit)
+      /**
+       * 🎥 BITRATE CALCULATION FOR 25MB LIMIT
+       * 
+       * OpenAI Whisper limit: 25MB
+       * Max recording time: 5 minutes = 300 seconds
+       * Target file size: 20MB (safety margin)
+       * 
+       * 20MB / 300s = 66.7 KB/s = 533 kbps total
+       * Split: 400 kbps video + 64 kbps audio = 464 kbps
+       * 
+       * This gives ~17MB for 5 min recording (safe margin)
+       */
       const recorder = new MediaRecorder(stream, {
         mimeType: 'video/webm;codecs=vp8,opus',
-        videoBitsPerSecond: 800_000,   // 0.8 Mbps - mobile-safe, prevents size overflow
-        audioBitsPerSecond: 96_000     // 96 kbps - clear audio for transcription
+        videoBitsPerSecond: 400_000,   // 400 kbps - lower quality but guaranteed under limit
+        audioBitsPerSecond: 64_000     // 64 kbps - sufficient for speech transcription
       });
 
       chunks.current = [];
 
       // Chunked recording - emits data every 5 seconds for memory efficiency
       // Also tracks size and triggers hard stop if limit exceeded
-      const maxSizeBytes = limits.maxFileSizeMB * 1024 * 1024;
+      // Use the LOWER of plan limit and OpenAI's 25MB hard limit
+      const OPENAI_MAX_MB = 24; // 24MB to have safety margin before 25MB limit
+      const effectiveMaxMB = Math.min(limits.maxFileSizeMB, OPENAI_MAX_MB);
+      const maxSizeBytes = effectiveMaxMB * 1024 * 1024;
       
       recorder.ondataavailable = e => {
         if (e.data.size > 0) {
           chunks.current.push(e.data);
           currentBlobSize.current += e.data.size;
           
-          // Check SIZE limit - hard stop if exceeded
+          // 🛑 SIZE LIMIT CHECK - hard stop if exceeded
+          // This is a HARD invariant - recording MUST stop before hitting OpenAI's limit
           if (currentBlobSize.current >= maxSizeBytes) {
-            console.warn(`📦 Max file size reached (${(currentBlobSize.current / 1024 / 1024).toFixed(1)}MB >= ${limits.maxFileSizeMB}MB) - forcing stop`);
+            console.warn(`📦 SIZE LIMIT REACHED: ${(currentBlobSize.current / 1024 / 1024).toFixed(1)}MB >= ${effectiveMaxMB}MB - FORCING STOP`);
             hardStopRecording('size');
           }
         }
