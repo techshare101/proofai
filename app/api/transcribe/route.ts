@@ -53,8 +53,20 @@ export async function POST(req: Request) {
     }
     
     const blob = await fileRes.blob();
+    const fileSizeMB = blob.size / 1024 / 1024;
+    console.log(`✅ File downloaded: ${fileSizeMB.toFixed(2)} MB`);
+    
+    // OpenAI Whisper has a hard 25MB limit
+    const OPENAI_MAX_SIZE_MB = 25;
+    if (fileSizeMB > OPENAI_MAX_SIZE_MB) {
+      console.error(`❌ File too large for OpenAI: ${fileSizeMB.toFixed(2)} MB > ${OPENAI_MAX_SIZE_MB} MB`);
+      return NextResponse.json({ 
+        error: `Recording too large (${fileSizeMB.toFixed(1)} MB). OpenAI Whisper has a 25MB limit. Please keep recordings under 10 minutes.`,
+        details: `File size: ${fileSizeMB.toFixed(2)} MB, Limit: ${OPENAI_MAX_SIZE_MB} MB`
+      }, { status: 413 });
+    }
+    
     const file = new File([blob], "recording.webm", { type: "video/webm" });
-    console.log(`✅ File downloaded: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
 
     // Step 2: Prepare OpenAI request
     const form = new FormData();

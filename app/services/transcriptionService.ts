@@ -107,6 +107,12 @@ export class TranscriptionService {
         }
         
         console.error('❌ Transcription API error detail:', error);
+        
+        // Handle specific error cases with user-friendly messages
+        if (response.status === 413 || responseText.includes('Maximum content size limit')) {
+          throw new Error('Recording too large. Please keep recordings under 10 minutes for best results. OpenAI has a 25MB file size limit.');
+        }
+        
         const errorMessage = error?.error?.message || error?.details || error?.message || `HTTP ${response.status}: ${response.statusText}`;
         throw new Error(`Transcription failed: ${errorMessage}`);
       }
