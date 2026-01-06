@@ -12,27 +12,13 @@ export default function PDFViewerModal({ report, onClose }: PDFViewerModalProps)
   const [fileSize, setFileSize] = useState<string>('Unknown')
   const [isLoading, setIsLoading] = useState(true)
   
+  // Use API route for secure PDF access
+  const pdfApiUrl = `/api/reports/${report.id}`
+  
   useEffect(() => {
-    // Function to fetch and calculate file size
-    const fetchFileSize = async () => {
-      try {
-        const response = await fetch(report.pdf_url, { method: 'HEAD' })
-        if (response.ok) {
-          const contentLength = response.headers.get('content-length')
-          if (contentLength) {
-            const size = parseInt(contentLength)
-            setFileSize(formatFileSize(size))
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching file size:', err)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    
-    fetchFileSize()
-  }, [report.pdf_url])
+    // Skip file size fetch - API route handles this securely
+    setIsLoading(false)
+  }, [report.id])
   
   // Helper function to format file size in KB, MB, etc.
   const formatFileSize = (bytes: number): string => {
@@ -80,13 +66,13 @@ export default function PDFViewerModal({ report, onClose }: PDFViewerModalProps)
     return `${diffInYears} year${diffInYears > 1 ? 's' : ''} ago`
   }
   
-  // Format date strings
-  const formattedDate = report.timestamp 
-    ? formatDate(new Date(report.timestamp))
+  // Format date strings - use created_at from Report type
+  const formattedDate = report.created_at 
+    ? formatDate(new Date(report.created_at))
     : 'Unknown date'
     
-  const timeAgo = report.timestamp 
-    ? getTimeAgo(new Date(report.timestamp))
+  const timeAgo = report.created_at 
+    ? getTimeAgo(new Date(report.created_at))
     : ''
 
   return (
@@ -110,10 +96,10 @@ export default function PDFViewerModal({ report, onClose }: PDFViewerModalProps)
         </div>
         
         <div className="flex flex-1 overflow-hidden">
-          {/* Main PDF viewer */}
+          {/* Main PDF viewer - Uses API route for secure access */}
           <div className="flex-1 bg-gray-100 overflow-hidden">
             <iframe 
-              src={`${report.pdf_url}#toolbar=0&navpanes=0`}
+              src={`${pdfApiUrl}#toolbar=0&navpanes=0`}
               className="w-full h-full border-0" 
               title={report.title}
               onLoad={() => setIsLoading(false)}
@@ -162,8 +148,9 @@ export default function PDFViewerModal({ report, onClose }: PDFViewerModalProps)
             
             <div className="mt-auto pt-4 border-t">
               <a 
-                href={report.pdf_url} 
-                download={`${report.title}.pdf`}
+                href={pdfApiUrl} 
+                target="_blank"
+                rel="noopener noreferrer"
                 className="flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">

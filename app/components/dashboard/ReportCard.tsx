@@ -113,12 +113,13 @@ export default function ReportCard({ report, onView, onDelete, onMove, folders =
       
       {/* Action Buttons - matching screenshot layout */}
       <div className="flex flex-wrap gap-2">
-        {/* View PDF Button */}
+        {/* View PDF Button - Uses API route for fresh signed URLs */}
         <button 
           onClick={(e) => {
             e.stopPropagation()
             if (report.pdf_url) {
-              window.open(report.pdf_url, '_blank')
+              // Use API route for secure, fresh signed URL access
+              window.open(`/api/reports/${report.id}`, '_blank', 'noopener')
             }
           }}
           disabled={!report.pdf_url}
