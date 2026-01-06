@@ -26,6 +26,22 @@
  * - useRecordingLimit() for monthly recording counts
  * 
  * DO NOT create plan-based recorder forks (RecorderPro, RecorderFree, etc.)
+ * 
+ * ---
+ * 🛑 PRODUCTION INVARIANT — RECORDING TERMINATION
+ * 
+ * Recording termination is controlled ONLY by:
+ * 1. TIME: elapsed seconds >= MAX_RECORDING_SECONDS (hardStopRecording('time'))
+ * 2. SIZE: currentBlobSize >= maxSizeBytes (hardStopRecording('size'))
+ * 
+ * RULES (non-negotiable):
+ * - UI (progress bar, colors, animations) is DERIVED ONLY — never authoritative
+ * - Upload MUST start from MediaRecorder.onstop — nowhere else
+ * - User actions MUST NOT override time/size-based stop
+ * - When red bar hits 100%, mic MUST be dead and upload MUST start
+ * 
+ * Violating this breaks legal-grade evidence capture.
+ * If changes are required, STOP and ask human approval.
  */
 'use client'
 
@@ -159,7 +175,18 @@ export default function Recorder() {
   const currentBlobSize = useRef<number>(0) // Track current recording size
   const MAX_RECORDING_SECONDS = 300 // 5 minutes hard limit
   
-  // Unified hard stop function - called for BOTH time limit AND size limit
+  /**
+   * 🛑 HARD INVARIANT — DO NOT WEAKEN
+   * 
+   * This function is the ONLY authority for stopping recording.
+   * It MUST be called when time OR size limit is reached.
+   * MediaRecorder.onstop will then trigger upload automatically.
+   * 
+   * DO NOT:
+   * - Add conditions that skip the stop
+   * - Move upload trigger elsewhere
+   * - Make this async or delayed
+   */
   const hardStopRecording = (reason: 'time' | 'size') => {
     console.log(`🛑 HARD STOP triggered: ${reason}`);
     
@@ -169,7 +196,7 @@ export default function Recorder() {
       recordingTimer.current = null;
     }
     
-    // 2. Force stop MediaRecorder
+    // 2. Force stop MediaRecorder — triggers onstop → upload
     if (mediaRecorder?.state === 'recording') {
       mediaRecorder.stop();
     }
@@ -177,7 +204,7 @@ export default function Recorder() {
     // 3. Update UI state
     setRecording(false);
     
-    // Note: onstop handler will transition to 'processing' state
+    // Note: onstop handler will transition to 'processing' state and start upload
   };
 
   // Toggle between front and back cameras

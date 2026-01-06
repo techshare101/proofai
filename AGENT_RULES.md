@@ -70,6 +70,61 @@ If a task requires modifying a canonical file:
 
 ---
 
+## 🛑 PRODUCTION INVARIANT — RECORDING TERMINATION
+
+**This is a non-negotiable system invariant.**
+
+Recording termination is controlled ONLY by:
+1. **TIME**: `elapsed seconds >= MAX_RECORDING_SECONDS` → `hardStopRecording('time')`
+2. **SIZE**: `currentBlobSize >= maxSizeBytes` → `hardStopRecording('size')`
+
+### Rules (DO NOT VIOLATE)
+
+- UI (progress bar, colors, animations) is **DERIVED ONLY** — never authoritative
+- Upload **MUST** start from `MediaRecorder.onstop` — nowhere else
+- User actions **MUST NOT** override time/size-based stop
+- When red bar hits 100%, mic **MUST** be dead and upload **MUST** start immediately
+
+### What This Means
+
+```
+Recording starts
+    ↓
+Green bar (safe)
+    ↓
+Yellow bar (warning)
+    ↓
+Red bar (final window)
+    ↓
+⛔ LIMIT REACHED (time OR size)
+    ↓
+hardStopRecording() called
+    ↓
+MediaRecorder.stop()
+    ↓
+onstop fires → upload begins
+    ↓
+UI shows "Processing / Uploading"
+```
+
+### Why This Matters
+
+If recording does not stop exactly at limit:
+- File size can exceed OpenAI Whisper's 25MB limit
+- Upload may fail silently
+- User thinks evidence is captured when it isn't
+- **Legal-grade trust is broken**
+
+### DO NOT
+
+- Add conditions that skip the stop
+- Move upload trigger elsewhere
+- Make hardStopRecording async or delayed
+- Couple progress bar to stop logic
+- Allow user to override time-based stop
+
+---
+
 ## 📋 CANONICAL FILE HEADER
 
 All locked files contain this header:
