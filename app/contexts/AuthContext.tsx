@@ -1,9 +1,18 @@
+/**
+ * 🔒 AUTH CONTEXT - Session state only
+ * 
+ * RULES:
+ * ❌ NO redirect logic here (handled by middleware)
+ * ❌ NO plan checks
+ * ❌ NO route-based decisions
+ * 
+ * ✅ Only provides session state to components
+ */
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import { Session } from '@supabase/supabase-js';
 import supabase from '../lib/supabase';
-import { useRouter, usePathname } from 'next/navigation';
 
 type AuthContextType = {
   session: Session | null;
@@ -16,8 +25,6 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-  const pathname = usePathname();
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -63,19 +70,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Handle auth redirects
-  useEffect(() => {
-    if (isLoading) return;
-
-    // Allow unauthenticated users to stay on the landing page ('/')
-    if (!session && pathname !== '/login' && pathname !== '/') {
-      router.push('/login');
-    }
-
-    if (session && (pathname === '/' || pathname === '/login')) {
-      router.push('/dashboard');
-    }
-  }, [session, isLoading, pathname, router]);
+  // ❌ REMOVED: Auth redirect logic
+  // Redirects are now handled by middleware.ts
+  // This context only provides session state
 
   return (
     <AuthContext.Provider value={{ session, isLoading }}>

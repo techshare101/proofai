@@ -1,3 +1,14 @@
+/**
+ * 🔒 AUTH CALLBACK - Single post-login redirect source of truth
+ * 
+ * REDIRECT RULE:
+ * If return_to param exists → go there
+ * Else → /dashboard
+ * 
+ * ❌ NEVER redirect to /
+ * ❌ NEVER use plan logic
+ * ❌ NEVER use legacy routes
+ */
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
@@ -7,24 +18,27 @@ export async function GET(request: Request) {
   try {
     const requestUrl = new URL(request.url);
     const code = requestUrl.searchParams.get('code');
-    const next = requestUrl.searchParams.get('next') || '/';
+    
+    // Single source of truth: return_to param or /dashboard (NEVER /)
+    const returnTo = requestUrl.searchParams.get('return_to') || '/dashboard';
 
     if (!code) {
       console.error('No code in callback');
-      return NextResponse.redirect(`${requestUrl.origin}?error=no_code`);
+      return NextResponse.redirect(`${requestUrl.origin}/login?error=no_code`);
     }
 
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (error) {
       console.error('Auth error:', error);
-      return NextResponse.redirect(`${requestUrl.origin}?error=${error.message}`);
+      return NextResponse.redirect(`${requestUrl.origin}/login?error=${encodeURIComponent(error.message)}`);
     }
 
-    // URL to redirect to after sign in process completes
-    return NextResponse.redirect(`${requestUrl.origin}${next}`);
+    // Single source of truth: use return_to or default to /dashboard
+    console.log('🔐 Auth callback redirecting to:', returnTo);
+    return NextResponse.redirect(`${requestUrl.origin}${returnTo}`);
   } catch (err) {
     console.error('Callback error:', err);
-    return NextResponse.redirect(`${new URL(request.url).origin}?error=callback_error`);
+    return NextResponse.redirect(`${new URL(request.url).origin}/login?error=callback_error`);
   }
 }

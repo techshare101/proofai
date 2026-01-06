@@ -1,18 +1,32 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { SupabaseClient } from '@supabase/supabase-js'
 
 export const dynamic = "force-dynamic";
 
+/**
+ * 🔒 LOGIN PAGE - Single post-login redirect source of truth
+ * 
+ * REDIRECT RULE:
+ * If return_to param exists → go there
+ * Else → /dashboard
+ * 
+ * NO OTHER REDIRECT LOGIC ALLOWED.
+ */
 export default function LoginPage() {
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState('')
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null)
+
+  // Single source of truth for post-login redirect
+  const returnTo = searchParams.get('return_to') || '/dashboard'
 
   useEffect(() => {
     const client = createBrowserClient(
@@ -30,10 +44,10 @@ export default function LoginPage() {
       setError('')
       
       // Use environment variable or current origin for redirect
-      // IMPORTANT: This URL must also be configured in Supabase Auth settings
+      // Pass return_to to auth callback so it knows where to go after
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
         (typeof window !== 'undefined' ? window.location.origin : 'https://proofai-prod.vercel.app')
-      const redirectUrl = `${baseUrl}/auth/callback`
+      const redirectUrl = `${baseUrl}/auth/callback?return_to=${encodeURIComponent(returnTo)}`
       
       console.log('🔐 Google OAuth redirect URL:', redirectUrl)
       
@@ -65,8 +79,8 @@ export default function LoginPage() {
 
       if (error) throw error
 
-      // Redirect on success
-      window.location.href = '/dashboard'
+      // Single source of truth: use return_to or default to /dashboard
+      window.location.href = returnTo
     } catch (err: any) {
       setError(err.message || 'Failed to login')
     } finally {
