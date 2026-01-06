@@ -16,7 +16,7 @@ function getSupabase() {
   return createClient(url, key);
 }
 
-// Handle PDF generation and direct download
+// Handle PDF generation and upload to Supabase Storage
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -35,6 +35,8 @@ export async function POST(req: Request) {
 
     const caseId = summary.caseId || `CASE-${Date.now()}`;
     const filename = `proofai-report-${caseId}.pdf`;
+    // Storage path - just the path relative to bucket root
+    const storagePath = `reports/${filename}`;
 
     // Generate PDF
     console.log('[PDF API] Generating PDF for case:', caseId);
@@ -73,12 +75,42 @@ export async function POST(req: Request) {
     
     console.log('[PDF API] PDF buffer length:', pdfBuffer.length);
 
-    // Return PDF directly for download
-    return new NextResponse(pdfBuffer, {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename=${filename}`,
-      },
+    // Upload PDF to Supabase Storage
+    const supabase = getSupabase();
+    console.log('[PDF API] Uploading PDF to storage:', storagePath);
+    
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('proofai-pdfs')
+      .upload(storagePath, pdfBuffer, {
+        contentType: 'application/pdf',
+        upsert: true, // Overwrite if exists
+      });
+
+    if (uploadError) {
+      console.error('[PDF API] Storage upload error:', uploadError);
+      // Fallback: return PDF directly for download if storage fails
+      return new NextResponse(pdfBuffer, {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename=${filename}`,
+        },
+      });
+    }
+
+    console.log('[PDF API] PDF uploaded successfully:', uploadData.path);
+
+    // Get public URL for the uploaded PDF
+    const { data: urlData } = supabase.storage
+      .from('proofai-pdfs')
+      .getPublicUrl(storagePath);
+
+    console.log('[PDF API] Public URL:', urlData.publicUrl);
+
+    // Return JSON with the storage URL (not blob URL)
+    return NextResponse.json({ 
+      url: urlData.publicUrl,
+      path: storagePath, // Also return path for future signed URL generation
+      success: true 
     });
 
   } catch (error: any) {

@@ -92,14 +92,23 @@ export async function GET(
     let pdfPath: string | null = null;
     
     if (report.pdf_url) {
-      // Handle various URL formats to extract the path
       const url = report.pdf_url;
+      console.log('📄 Extracting path from pdf_url:', url);
+      
+      // Skip blob URLs - these are temporary browser URLs that can't be used
+      if (url.startsWith('blob:')) {
+        console.error('❌ PDF URL is a blob URL (temporary) - cannot generate signed URL');
+        return NextResponse.json({ 
+          error: 'This report was created before storage was configured. Please re-record to fix.' 
+        }, { status: 400 });
+      }
       
       // Pattern 1: Public URL - extract path after bucket name
       // https://xxx.supabase.co/storage/v1/object/public/proofai-pdfs/path/to/file.pdf
       const publicMatch = url.match(/\/object\/public\/proofai-pdfs\/(.+)$/);
       if (publicMatch) {
         pdfPath = publicMatch[1];
+        console.log('📄 Matched public URL pattern, path:', pdfPath);
       }
       
       // Pattern 2: Signed URL - extract path after bucket name
@@ -108,12 +117,24 @@ export async function GET(
         const signedMatch = url.match(/\/object\/sign\/proofai-pdfs\/(.+?)(\?|$)/);
         if (signedMatch) {
           pdfPath = signedMatch[1];
+          console.log('📄 Matched signed URL pattern, path:', pdfPath);
         }
       }
       
-      // Pattern 3: Direct path (already just the path)
+      // Pattern 3: Direct path (already just the path, e.g., "reports/filename.pdf")
       if (!pdfPath && !url.startsWith('http')) {
         pdfPath = url;
+        console.log('📄 Using direct path:', pdfPath);
+      }
+      
+      // Pattern 4: Any other Supabase storage URL format
+      if (!pdfPath) {
+        // Try to extract from any proofai-pdfs reference
+        const genericMatch = url.match(/proofai-pdfs\/(.+?)(\?|$)/);
+        if (genericMatch) {
+          pdfPath = genericMatch[1];
+          console.log('📄 Matched generic pattern, path:', pdfPath);
+        }
       }
     }
 
@@ -122,7 +143,7 @@ export async function GET(
       return NextResponse.json({ error: 'PDF not available' }, { status: 404 });
     }
 
-    console.log('📄 Generating signed URL for:', pdfPath);
+    console.log('📄 Generating signed URL for path:', pdfPath);
 
     // 5️⃣ Generate fresh signed URL (60 seconds)
     const { data: signedData, error: signedError } = await supabase.storage

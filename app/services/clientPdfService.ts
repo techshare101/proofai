@@ -124,15 +124,26 @@ export class ClientPDFService {
       }
     }
 
-    // Handle direct PDF response instead of JSON
+    // Handle response - could be JSON (with URL) or direct PDF (fallback)
     const contentType = response.headers.get('Content-Type');
-    if (contentType && contentType.includes('application/pdf')) {
-      // For direct PDF response, create an object URL and return it
+    
+    if (contentType && contentType.includes('application/json')) {
+      // JSON response with storage URL (preferred)
+      const result = await response.json();
+      if (result.url) {
+        console.log('[ClientPDFService] PDF uploaded to storage:', result.url);
+        return result.url;
+      }
+      throw new Error('No URL in PDF response');
+    } else if (contentType && contentType.includes('application/pdf')) {
+      // Fallback: direct PDF response (storage upload failed)
+      // Create blob URL - note: this is temporary and won't work for signed URL generation
+      console.warn('[ClientPDFService] Received direct PDF blob - storage upload may have failed');
       const pdfBlob = await response.blob();
       const pdfUrl = URL.createObjectURL(pdfBlob);
       return pdfUrl;
     } else {
-      // Fallback to previous behavior for backward compatibility
+      // Try to parse as JSON anyway
       try {
         const result = await response.json();
         const cleanUrl = result.url?.replace(/([^:])\/\{2,\}/g, '$1/');
