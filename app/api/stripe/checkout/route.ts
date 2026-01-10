@@ -24,11 +24,18 @@ const getAppUrl = (request: NextRequest) => {
 
 // Map plan types to Stripe price IDs
 const PLAN_TO_PRICE: Record<string, string | undefined> = {
+  // Subscriptions (identity - one at a time)
   community: process.env.NEXT_PUBLIC_STRIPE_PRICE_COMMUNITY,
   self_defender: process.env.NEXT_PUBLIC_STRIPE_PRICE_SELF_DEFENDER,
   mission_partner: process.env.NEXT_PUBLIC_STRIPE_PRICE_MISSION_PARTNER,
+  business: process.env.NEXT_PUBLIC_STRIPE_PRICE_BUSINESS,
+  // One-time packs (stackable)
   emergency_pack: process.env.NEXT_PUBLIC_STRIPE_PRICE_EMERGENCY_PACK,
+  court_certification: process.env.NEXT_PUBLIC_STRIPE_PRICE_COURT_CERTIFICATION,
 };
+
+// One-time payment types (not subscriptions)
+const ONE_TIME_PLANS = ['emergency_pack', 'court_certification'];
 
 export async function POST(request: NextRequest) {
   try {
@@ -97,8 +104,8 @@ export async function POST(request: NextRequest) {
         .eq('id', userId);
     }
 
-    // Determine if this is a one-time payment (emergency pack) or subscription
-    const isOneTime = planType === 'emergency_pack';
+    // Determine if this is a one-time payment or subscription
+    const isOneTime = ONE_TIME_PLANS.includes(planType);
     
     // Get the app URL dynamically
     const appUrl = getAppUrl(request);

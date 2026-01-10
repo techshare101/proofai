@@ -22,8 +22,8 @@ export type PlanType =
   | 'starter'           // Free - $0/mo
   | 'community'         // $4.99/mo
   | 'self_defender'     // $9.99/mo (highlighted as "Pro")
-  | 'emergency_pack'    // $14.99 one-time
   | 'mission_partner'   // $19.99/mo
+  | 'business'          // Business tier
   | 'pro';              // Dev bypass / legacy
 
 export interface UserPlan {
@@ -41,6 +41,10 @@ export interface UserPlan {
     aiSummary: boolean;
     customBranding: boolean;
   };
+  // One-time packs (stackable with any plan)
+  emergencyCredits: number;
+  hasEmergencyPack: boolean;
+  hasCourtCertification: boolean;
 }
 
 // Plan limits matching pricing page
@@ -78,10 +82,10 @@ const PLAN_LIMITS: Record<PlanType, UserPlan['limits']> = {
     aiSummary: true,
     customBranding: true,
   },
-  emergency_pack: {
-    recordingsPerMonth: 10, // Total, not per month
-    storageDays: Infinity, // Lifetime
-    maxFileSizeMB: 500,
+  business: {
+    recordingsPerMonth: Infinity,
+    storageDays: Infinity,
+    maxFileSizeMB: 1000,
     videoQuality: 'max',
     pdfExport: true,
     folders: true,
@@ -124,6 +128,9 @@ export async function getUserPlan(userId: string): Promise<UserPlan> {
       status: 'active',
       source: 'dev-bypass',
       limits: PLAN_LIMITS.pro,
+      emergencyCredits: 0,
+      hasEmergencyPack: false,
+      hasCourtCertification: false,
     };
   }
 
@@ -135,6 +142,17 @@ export async function getUserPlan(userId: string): Promise<UserPlan> {
       .eq('user_id', userId)
       .single();
 
+    // Also fetch pack status from profiles
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('emergency_credits, has_emergency_pack, has_court_certification')
+      .eq('id', userId)
+      .single();
+
+    const emergencyCredits = profile?.emergency_credits || 0;
+    const hasEmergencyPack = profile?.has_emergency_pack || false;
+    const hasCourtCertification = profile?.has_court_certification || false;
+
     if (error || !subscription) {
       // No subscription found - return starter (free) tier
       return {
@@ -142,6 +160,9 @@ export async function getUserPlan(userId: string): Promise<UserPlan> {
         status: 'inactive',
         source: 'default',
         limits: PLAN_LIMITS.starter,
+        emergencyCredits,
+        hasEmergencyPack,
+        hasCourtCertification,
       };
     }
 
@@ -151,10 +172,9 @@ export async function getUserPlan(userId: string): Promise<UserPlan> {
         'community': 'community',
         'self_defender': 'self_defender',
         'self-defender': 'self_defender',
-        'emergency_pack': 'emergency_pack',
-        'emergency-pack': 'emergency_pack',
         'mission_partner': 'mission_partner',
         'mission-partner': 'mission_partner',
+        'business': 'business',
       };
 
       const plan = planMap[subscription.current_plan || ''] || 'community';
@@ -164,6 +184,9 @@ export async function getUserPlan(userId: string): Promise<UserPlan> {
         status: 'active',
         source: 'stripe',
         limits: PLAN_LIMITS[plan],
+        emergencyCredits,
+        hasEmergencyPack,
+        hasCourtCertification,
       };
     }
 
@@ -173,6 +196,9 @@ export async function getUserPlan(userId: string): Promise<UserPlan> {
       status: (subscription.subscription_status as UserPlan['status']) || 'inactive',
       source: 'stripe',
       limits: PLAN_LIMITS.starter,
+      emergencyCredits,
+      hasEmergencyPack,
+      hasCourtCertification,
     };
   } catch (err) {
     console.error('Error fetching user plan:', err);
@@ -182,6 +208,9 @@ export async function getUserPlan(userId: string): Promise<UserPlan> {
       status: 'inactive',
       source: 'default',
       limits: PLAN_LIMITS.starter,
+      emergencyCredits: 0,
+      hasEmergencyPack: false,
+      hasCourtCertification: false,
     };
   }
 }
@@ -202,6 +231,9 @@ export function getDevBypassPlan(): UserPlan | null {
       status: 'active',
       source: 'dev-bypass',
       limits: PLAN_LIMITS.pro,
+      emergencyCredits: 0,
+      hasEmergencyPack: false,
+      hasCourtCertification: false,
     };
   }
   return null;

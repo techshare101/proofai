@@ -9,13 +9,18 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Map Stripe price IDs to plan types
+// Map Stripe price IDs to SUBSCRIPTION plans (identity)
 const PRICE_TO_PLAN: Record<string, string> = {
   [process.env.NEXT_PUBLIC_STRIPE_PRICE_COMMUNITY!]: 'community',
   [process.env.NEXT_PUBLIC_STRIPE_PRICE_SELF_DEFENDER!]: 'self_defender',
   [process.env.NEXT_PUBLIC_STRIPE_PRICE_MISSION_PARTNER!]: 'mission_partner',
   [process.env.NEXT_PUBLIC_STRIPE_PRICE_BUSINESS!]: 'business',
-  [process.env.NEXT_PUBLIC_STRIPE_PRICE_COURT_CERTIFICATION!]: 'court_certification',
+};
+
+// One-time pack price IDs (stackable, don't replace plan)
+const ONE_TIME_PACKS = {
+  EMERGENCY_PACK: process.env.NEXT_PUBLIC_STRIPE_PRICE_EMERGENCY_PACK,
+  COURT_CERTIFICATION: process.env.NEXT_PUBLIC_STRIPE_PRICE_COURT_CERTIFICATION,
 };
 
 async function updateSubscriptionStatus(
@@ -80,12 +85,46 @@ export async function POST(request: NextRequest) {
           break;
         }
 
-        // For one-time payments (emergency pack)
+        // For one-time payments (Emergency Pack / Court Certification)
         if (session.mode === 'payment') {
+          const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
+          const priceId = lineItems.data[0]?.price?.id;
+
+          // Emergency Pack - adds credits, doesn't change plan
+          if (priceId === ONE_TIME_PACKS.EMERGENCY_PACK) {
+            console.log(`🎁 Granting Emergency Pack to user ${userId}`);
+            const { error } = await supabase.rpc('grant_emergency_pack', {
+              user_id_input: userId,
+            });
+            if (error) {
+              console.error('Error granting emergency pack:', error);
+              // Fallback: direct update
+              await supabase
+                .from('profiles')
+                .update({
+                  emergency_credits: supabase.rpc('increment_emergency_credits', { user_id_input: userId }),
+                  has_emergency_pack: true,
+                })
+                .eq('id', userId);
+            }
+          }
+
+          // Court Certification - grants legal features
+          if (priceId === ONE_TIME_PACKS.COURT_CERTIFICATION) {
+            console.log(`⚖️ Granting Court Certification to user ${userId}`);
+            await supabase
+              .from('profiles')
+              .update({
+                has_court_certification: true,
+                court_certified_at: new Date().toISOString(),
+              })
+              .eq('id', userId);
+          }
+
+          // Also update subscription status for tracking
           await updateSubscriptionStatus(userId, {
             has_active_subscription: true,
             subscription_status: 'active',
-            current_plan: planType || 'emergency_pack',
             stripe_customer_id: session.customer as string,
           });
         }

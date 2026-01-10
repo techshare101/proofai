@@ -37,6 +37,9 @@ const DEFAULT_PLAN: UserPlan = {
     aiSummary: false,
     customBranding: false,
   },
+  emergencyCredits: 0,
+  hasEmergencyPack: false,
+  hasCourtCertification: false,
 };
 
 export function useUserPlan() {
@@ -84,5 +87,9 @@ export function useUserPlan() {
     isPro: plan.plan !== 'starter' && plan.status === 'active',
     isDevBypass: plan.source === 'dev-bypass',
     limits: plan.limits,
+    // One-time packs (stackable)
+    emergencyCredits: plan.emergencyCredits,
+    hasEmergencyPack: plan.hasEmergencyPack,
+    hasCourtCertification: plan.hasCourtCertification,
   };
 }
