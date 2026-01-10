@@ -102,12 +102,19 @@ export default function ReportCard({ report, onView, onDelete, onMove, folders =
       {...listeners}
     >
       {/* Title */}
-      <h3 className="text-base font-semibold text-gray-900 mb-1">
+      <h3 className="text-base font-semibold text-gray-900 mb-1 truncate" title={report.title}>
         {report.title}
       </h3>
       
+      {/* Folder Badge */}
+      {report.folder_name && (
+        <span className="inline-block px-2 py-0.5 text-xs font-medium text-blue-600 bg-blue-50 rounded mb-2">
+          {report.folder_name}
+        </span>
+      )}
+      
       {/* Date */}
-      <p className="text-sm text-gray-500 mb-4">
+      <p className="text-sm text-gray-500 mb-3">
         {report.created_at ? formatDate(report.created_at) : 'Unknown date'}
       </p>
       
