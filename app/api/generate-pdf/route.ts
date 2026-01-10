@@ -76,11 +76,13 @@ export async function POST(req: Request) {
     console.log('[PDF API] PDF buffer length:', pdfBuffer.length);
 
     // Upload PDF to Supabase Storage
+    // Note: bucket is named 'reports' (not 'proofai-pdfs')
     const supabase = getSupabase();
-    console.log('[PDF API] Uploading PDF to storage:', storagePath);
+    const bucketName = 'reports';
+    console.log('[PDF API] Uploading PDF to storage bucket:', bucketName, 'path:', storagePath);
     
     const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('proofai-pdfs')
+      .from(bucketName)
       .upload(storagePath, pdfBuffer, {
         contentType: 'application/pdf',
         upsert: true, // Overwrite if exists
@@ -101,7 +103,7 @@ export async function POST(req: Request) {
 
     // Get public URL for the uploaded PDF
     const { data: urlData } = supabase.storage
-      .from('proofai-pdfs')
+      .from(bucketName)
       .getPublicUrl(storagePath);
 
     console.log('[PDF API] Public URL:', urlData.publicUrl);

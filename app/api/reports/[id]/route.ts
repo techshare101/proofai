@@ -103,18 +103,18 @@ export async function GET(
         }, { status: 400 });
       }
       
-      // Pattern 1: Public URL - extract path after bucket name
-      // https://xxx.supabase.co/storage/v1/object/public/proofai-pdfs/path/to/file.pdf
-      const publicMatch = url.match(/\/object\/public\/proofai-pdfs\/(.+)$/);
+      // Pattern 1: Public URL - extract path after bucket name (reports bucket)
+      // https://xxx.supabase.co/storage/v1/object/public/reports/path/to/file.pdf
+      const publicMatch = url.match(/\/object\/public\/reports\/(.+)$/);
       if (publicMatch) {
         pdfPath = publicMatch[1];
         console.log('📄 Matched public URL pattern, path:', pdfPath);
       }
       
       // Pattern 2: Signed URL - extract path after bucket name
-      // https://xxx.supabase.co/storage/v1/object/sign/proofai-pdfs/path/to/file.pdf?token=...
+      // https://xxx.supabase.co/storage/v1/object/sign/reports/path/to/file.pdf?token=...
       if (!pdfPath) {
-        const signedMatch = url.match(/\/object\/sign\/proofai-pdfs\/(.+?)(\?|$)/);
+        const signedMatch = url.match(/\/object\/sign\/reports\/(.+?)(\?|$)/);
         if (signedMatch) {
           pdfPath = signedMatch[1];
           console.log('📄 Matched signed URL pattern, path:', pdfPath);
@@ -129,8 +129,8 @@ export async function GET(
       
       // Pattern 4: Any other Supabase storage URL format
       if (!pdfPath) {
-        // Try to extract from any proofai-pdfs reference
-        const genericMatch = url.match(/proofai-pdfs\/(.+?)(\?|$)/);
+        // Try to extract from any reports bucket reference
+        const genericMatch = url.match(/reports\/(.+?)(\?|$)/);
         if (genericMatch) {
           pdfPath = genericMatch[1];
           console.log('📄 Matched generic pattern, path:', pdfPath);
@@ -147,7 +147,7 @@ export async function GET(
 
     // 5️⃣ Generate fresh signed URL (60 seconds)
     const { data: signedData, error: signedError } = await supabase.storage
-      .from('proofai-pdfs')
+      .from('reports')
       .createSignedUrl(pdfPath, 60);
 
     if (signedError || !signedData?.signedUrl) {
