@@ -152,6 +152,7 @@ export default function Recorder() {
   const streamRef = useRef<MediaStream | null>(null)
   const [recording, setRecording] = useState(false)
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null) // Ref for closure-safe access
   const [error, setError] = useState<string>('')
   const [status, setStatus] = useState<RecorderStatus>('idle')
   const [language, setLanguage] = useState('')
@@ -197,15 +198,18 @@ export default function Recorder() {
       recordingTimer.current = null;
     }
     
-    // 2. Force stop MediaRecorder — triggers onstop → upload
-    if (mediaRecorder?.state === 'recording') {
-      mediaRecorder.stop();
-    }
-    
-    // 3. Update UI state
+    // 2. Update UI state immediately so button changes
+    setStatus('processing');
     setRecording(false);
     
-    // Note: onstop handler will transition to 'processing' state and start upload
+    // 3. Force stop MediaRecorder — use REF to avoid stale closure
+    const recorder = mediaRecorderRef.current;
+    if (recorder?.state === 'recording') {
+      console.log('🛑 Calling mediaRecorder.stop() from ref');
+      recorder.stop();
+    } else {
+      console.warn(`🛑 MediaRecorder not recording. State: ${recorder?.state || 'null'}`);
+    }
   };
 
   // Toggle between front and back cameras
@@ -381,7 +385,8 @@ export default function Recorder() {
         }
       }, 1000);
 
-      setStatus('recording');
+      // Note: setStatus('recording') moved to AFTER recorder.start() to ensure
+      // the Stop button only appears when mediaRecorder is actually ready
       
       /**
        * 🎥 BITRATE CALCULATION FOR 25MB LIMIT
@@ -431,6 +436,9 @@ export default function Recorder() {
           clearInterval(recordingTimer.current);
           recordingTimer.current = null;
         }
+        
+        // Clear the mediaRecorder ref
+        mediaRecorderRef.current = null;
         
         // Transition to processing state
         setStatus('processing');
@@ -558,8 +566,10 @@ export default function Recorder() {
 
       // Start with 5-second chunks for memory efficiency
       recorder.start(5000);
+      mediaRecorderRef.current = recorder; // Store in ref for closure-safe access
       setMediaRecorder(recorder);
       setRecording(true);
+      setStatus('recording'); // Set status AFTER recorder is started and stored
       setError('');
     } catch (e) {
       console.error('Recording error:', e);
@@ -576,12 +586,27 @@ export default function Recorder() {
 
   const stopRecording = () => {
     console.log('Stop recording triggered');
-    if (mediaRecorder?.state === 'recording') {
+    
+    // Clear the recording timer immediately
+    if (recordingTimer.current) {
+      clearInterval(recordingTimer.current);
+      recordingTimer.current = null;
+    }
+    
+    // Use ref for closure-safe access (same as hardStopRecording)
+    const recorder = mediaRecorderRef.current;
+    if (recorder?.state === 'recording') {
       console.log('Stopping media recorder...');
-      mediaRecorder.stop();
+      setStatus('processing'); // Immediately update UI to show processing
+      recorder.stop();
       // Note: setRecording(false) is called in recorder.onstop handler
     } else {
-      console.warn(`MediaRecorder not in recording state. Current state: ${mediaRecorder?.state || 'undefined'}`);
+      console.warn(`MediaRecorder not in recording state. Current state: ${recorder?.state || 'undefined'}`);
+      // Reset status if recorder wasn't actually recording
+      if (status === 'recording') {
+        setStatus('ready');
+        setRecording(false);
+      }
     }
   };
 
