@@ -41,13 +41,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (error) {
           console.error('Session error:', error);
+          // Handle invalid refresh token by signing out
+          if (error.message?.includes('Refresh Token') || 
+              error.message?.includes('refresh_token') ||
+              error.name === 'AuthApiError') {
+            console.warn('Invalid refresh token detected, signing out...');
+            await supabase.auth.signOut();
+            setSession(null);
+          }
         }
         
         if (data?.session) {
           setSession(data.session);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Session init error:', err);
+        // Handle auth errors by clearing session
+        if (err?.message?.includes('Refresh Token') || err?.name === 'AuthApiError') {
+          console.warn('Auth error detected, clearing session...');
+          await supabase.auth.signOut();
+          setSession(null);
+        }
       } finally {
         if (mounted) {
           setIsLoading(false);
@@ -58,8 +72,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     init();
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (event, session) => {
         if (!mounted) return;
+        
+        // Handle token refresh errors
+        if (event === 'TOKEN_REFRESHED' && !session) {
+          console.warn('Token refresh failed, signing out...');
+          await supabase.auth.signOut();
+          setSession(null);
+          return;
+        }
+        
+        // Handle sign out event
+        if (event === 'SIGNED_OUT') {
+          setSession(null);
+          return;
+        }
+        
         setSession(session);
       }
     );
