@@ -19,8 +19,17 @@ const PROTECTED_ROUTES = ['/dashboard', '/recorder'];
 // Checkout routes that need auth (but NOT success/cancel pages)
 const CHECKOUT_PROTECTED = ['/checkout'];
 
-// Legacy routes to block
-const LEGACY_ROUTES = ['/record/pro', '/record-old', '/recorder-pro', '/dashboard-old'];
+// Legacy routes to block - RADICAL SWEEP v3
+// ALL of these redirect to canonical routes
+const LEGACY_ROUTES = [
+  '/record/pro',
+  '/record-old', 
+  '/recorder-pro',
+  '/dashboard-old',
+  '/report-dashboard-pro',  // Deleted zombie route
+  '/pages',                  // Deleted zombie route
+  '/demo-seed',              // Dev-only route
+];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -108,5 +117,8 @@ export const config = {
     '/record-old/:path*',
     '/recorder-pro/:path*',
     '/dashboard-old/:path*',
+    '/report-dashboard-pro/:path*',
+    '/pages/:path*',
+    '/demo-seed/:path*',
   ],
 };
