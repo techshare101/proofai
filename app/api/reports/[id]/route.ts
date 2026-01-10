@@ -149,25 +149,25 @@ export async function GET(
       return NextResponse.json({ error: 'PDF not available' }, { status: 404 });
     }
 
-    console.log('📄 Generating signed URL for path:', pdfPath);
+    console.log('📄 Getting public URL for path:', pdfPath);
 
-    // 5️⃣ Generate fresh signed URL (60 seconds)
-    const { data: signedData, error: signedError } = await supabase.storage
+    // 5️⃣ Get public URL (reports bucket is public)
+    const { data: urlData } = supabase.storage
       .from('reports')
-      .createSignedUrl(pdfPath, 60);
+      .getPublicUrl(pdfPath);
 
-    if (signedError || !signedData?.signedUrl) {
-      console.error('❌ Failed to generate signed URL:', signedError);
+    if (!urlData?.publicUrl) {
+      console.error('❌ Failed to get public URL');
       return NextResponse.json(
         { error: 'Unable to generate report URL' },
         { status: 500 }
       );
     }
 
-    console.log('✅ Redirecting to signed PDF URL');
+    console.log('✅ Redirecting to public PDF URL:', urlData.publicUrl);
 
     // 6️⃣ Redirect browser to PDF
-    return NextResponse.redirect(signedData.signedUrl);
+    return NextResponse.redirect(urlData.publicUrl);
   } catch (error) {
     console.error('❌ Report API error:', error);
     return NextResponse.json(
