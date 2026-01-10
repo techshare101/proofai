@@ -13,7 +13,11 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 // Routes that require authentication
-const PROTECTED_ROUTES = ['/dashboard', '/recorder', '/checkout'];
+// Note: /checkout/success and /checkout/cancel are PUBLIC (Stripe redirects here)
+const PROTECTED_ROUTES = ['/dashboard', '/recorder'];
+
+// Checkout routes that need auth (but NOT success/cancel pages)
+const CHECKOUT_PROTECTED = ['/checkout'];
 
 // Legacy routes to block
 const LEGACY_ROUTES = ['/record/pro', '/record-old', '/recorder-pro', '/dashboard-old'];
@@ -28,8 +32,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Check if this is a protected route
-  const isProtectedRoute = PROTECTED_ROUTES.some(route => pathname.startsWith(route));
+  // Allow public checkout pages (Stripe redirects here)
+  if (pathname === '/checkout/success' || pathname === '/checkout/cancel') {
+    return NextResponse.next();
+  }
+
+  // Check if this is a protected route (including /checkout but not success/cancel)
+  const isProtectedRoute = PROTECTED_ROUTES.some(route => pathname.startsWith(route)) ||
+    (pathname === '/checkout' || (pathname.startsWith('/checkout') && pathname !== '/checkout/success' && pathname !== '/checkout/cancel'));
   
   if (isProtectedRoute) {
     // Create Supabase client to check auth
