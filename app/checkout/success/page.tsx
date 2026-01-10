@@ -7,8 +7,12 @@
  * - Never use plan-based routing
  * - Show thank you message
  * - Let user click to go to dashboard
+ * 
+ * UNKILLABLE: force-dynamic prevents edge pre-rendering and 404 fallbacks
  */
 'use client';
+
+export const dynamic = 'force-dynamic';
 
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';

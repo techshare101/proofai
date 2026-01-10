@@ -1,4 +1,10 @@
+/**
+ * 🔒 CHECKOUT CANCEL PAGE - UNKILLABLE
+ * force-dynamic prevents edge pre-rendering and 404 fallbacks
+ */
 'use client';
+
+export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
 
