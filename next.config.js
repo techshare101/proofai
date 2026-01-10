@@ -24,6 +24,34 @@ const nextConfig = {
           value: "default-src 'self' https://*.supabase.co https://*.opencagedata.com https://generativelanguage.googleapis.com https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co https://*.opencagedata.com https://generativelanguage.googleapis.com https://cdn.jsdelivr.net https://api.openai.com; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; media-src 'self' blob: https://d4qgj78fzsl5j.cloudfront.net; img-src 'self' data: blob:;"
         }
       ]
+    },
+    {
+      // Prevent caching of HTML pages to avoid stale UI after deployments
+      source: '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)).*)',
+      headers: [
+        {
+          key: 'Cache-Control',
+          value: 'no-cache, no-store, must-revalidate'
+        },
+        {
+          key: 'Pragma',
+          value: 'no-cache'
+        },
+        {
+          key: 'Expires',
+          value: '0'
+        }
+      ]
+    },
+    {
+      // Allow caching of static assets with revalidation
+      source: '/_next/static/:path*',
+      headers: [
+        {
+          key: 'Cache-Control',
+          value: 'public, max-age=31536000, immutable'
+        }
+      ]
     }
   ],
   webpack: (config) => {
