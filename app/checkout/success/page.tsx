@@ -17,43 +17,88 @@ function CheckoutSuccessContent() {
   const sessionId = searchParams.get('session_id');
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center mx-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-4">
+      {/* Decorative background elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-white/10 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-white/10 rounded-full blur-3xl"></div>
+      </div>
+      
+      <div className="relative max-w-lg w-full bg-white rounded-3xl shadow-2xl p-10 text-center mx-4">
+        {/* Confetti Animation */}
+        <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
+          <span className="text-5xl animate-bounce">🎉</span>
+        </div>
+
         {/* Success Icon */}
-        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        <div className="w-24 h-24 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+          <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
           </svg>
         </div>
 
-        {/* Thank You Message */}
-        <h1 className="text-3xl font-bold text-gray-900 mb-3">Thank You! 🎉</h1>
-        <p className="text-lg text-gray-600 mb-2">
-          Your payment was successful.
+        {/* Welcome Message */}
+        <h1 className="text-4xl font-bold text-gray-900 mb-2">Welcome to ProofAI Pro!</h1>
+        <p className="text-xl text-green-600 font-semibold mb-4">
+          ✨ Your upgrade is complete!
         </p>
-        <p className="text-gray-500 mb-8">
-          Your account has been upgraded and you now have access to all your premium features. Start documenting your truth today!
-        </p>
+        
+        {/* Benefits List */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 mb-8 text-left">
+          <p className="text-gray-700 font-medium mb-3">You now have access to:</p>
+          <ul className="space-y-2">
+            <li className="flex items-center text-gray-600">
+              <svg className="w-5 h-5 text-green-500 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              Unlimited recordings
+            </li>
+            <li className="flex items-center text-gray-600">
+              <svg className="w-5 h-5 text-green-500 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              Extended recording time
+            </li>
+            <li className="flex items-center text-gray-600">
+              <svg className="w-5 h-5 text-green-500 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              Priority AI processing
+            </li>
+            <li className="flex items-center text-gray-600">
+              <svg className="w-5 h-5 text-green-500 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              Advanced report features
+            </li>
+          </ul>
+        </div>
 
-        {/* Go to Dashboard Button */}
+        {/* Primary CTA - Go to Dashboard */}
         <Link
           href="/dashboard"
-          className="block w-full px-6 py-4 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition shadow-lg hover:shadow-xl"
+          className="block w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-lg rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
         >
           Go to Dashboard →
         </Link>
 
-        {/* Secondary Action */}
+        {/* Secondary CTA - Start Recording */}
         <Link
           href="/recorder"
-          className="inline-block w-full px-6 py-3 mt-4 text-blue-600 font-medium hover:text-blue-700 transition"
+          className="inline-flex items-center justify-center w-full px-6 py-4 mt-4 bg-green-50 text-green-700 font-semibold rounded-xl hover:bg-green-100 transition border-2 border-green-200"
         >
-          Or start recording now
+          <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+            <circle cx="10" cy="10" r="6" className="text-red-500" />
+          </svg>
+          Start Recording Now
         </Link>
 
         {/* Support Note */}
-        <p className="text-xs text-gray-400 mt-8">
-          Questions? Contact us at support@proofai.app
+        <p className="text-sm text-gray-400 mt-8">
+          Questions? We're here to help at{' '}
+          <a href="mailto:support@proofai.app" className="text-blue-500 hover:underline">
+            support@proofai.app
+          </a>
         </p>
       </div>
     </div>
@@ -63,11 +108,11 @@ function CheckoutSuccessContent() {
 export default function CheckoutSuccessPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <h1 className="text-xl font-semibold text-gray-900">Processing your payment...</h1>
-          <p className="text-gray-600 mt-2">Please wait while we activate your account.</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8 text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto mb-6"></div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Almost there!</h1>
+          <p className="text-gray-600">Activating your premium account...</p>
         </div>
       </div>
     }>

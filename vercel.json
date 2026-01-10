@@ -3,6 +3,7 @@
   "installCommand": "npm install",
   "buildCommand": "npm run build",
   "env": {
+    "NEXT_PUBLIC_APP_URL": "https://proofai-prod.vercel.app",
     "NEXT_PUBLIC_SUPABASE_URL": "https://fiwtckfmtbcxryhhggsb.supabase.co",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpd3Rja2ZtdGJjeHJ5aGhnZ3NiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDEyMDc4NDksImV4cCI6MjAxNjc4Mzg0OX0.Nh1HhPDvwBB9RclHVhGxEsj_5aqYrPEwI0QZlF8uDYo",
     "NEXT_PUBLIC_OPENCAGE_API_KEY": "af5e9cfe0b6a443f80edd940d23718f0",
