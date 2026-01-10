@@ -121,7 +121,7 @@ export async function GET(
         }
       }
       
-      // Pattern 3: Direct path (already just the path, e.g., "reports/filename.pdf")
+      // Pattern 3: Direct path (already just the path, e.g., "filename.pdf")
       if (!pdfPath && !url.startsWith('http')) {
         pdfPath = url;
         console.log('📄 Using direct path:', pdfPath);
@@ -135,6 +135,12 @@ export async function GET(
           pdfPath = genericMatch[1];
           console.log('📄 Matched generic pattern, path:', pdfPath);
         }
+      }
+      
+      // Fix double 'reports/' prefix if present (legacy bug)
+      if (pdfPath && pdfPath.startsWith('reports/')) {
+        pdfPath = pdfPath.replace(/^reports\//, '');
+        console.log('📄 Removed duplicate reports/ prefix, path:', pdfPath);
       }
     }
 

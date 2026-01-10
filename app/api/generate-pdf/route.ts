@@ -35,8 +35,8 @@ export async function POST(req: Request) {
 
     const caseId = summary.caseId || `CASE-${Date.now()}`;
     const filename = `proofai-report-${caseId}.pdf`;
-    // Storage path - just the path relative to bucket root
-    const storagePath = `reports/${filename}`;
+    // Storage path - just the filename since bucket is already 'reports'
+    const storagePath = filename;
 
     // Generate PDF
     console.log('[PDF API] Generating PDF for case:', caseId);
