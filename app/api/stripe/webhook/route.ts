@@ -79,6 +79,9 @@ export async function POST(request: NextRequest) {
         const session = event.data.object as Stripe.Checkout.Session;
         const userId = session.metadata?.userId;
         const planType = session.metadata?.planType;
+        const priceIdFromMetadata = session.metadata?.priceId;
+
+        console.log(`🔔 Checkout completed: userId=${userId}, planType=${planType}, priceId=${priceIdFromMetadata}, mode=${session.mode}`);
 
         if (!userId) {
           console.error('No userId in checkout session metadata');
@@ -87,8 +90,13 @@ export async function POST(request: NextRequest) {
 
         // For one-time payments (Emergency Pack / Court Certification)
         if (session.mode === 'payment') {
-          const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
-          const priceId = lineItems.data[0]?.price?.id;
+          // Use priceId from metadata first, fallback to line items
+          let priceId = priceIdFromMetadata;
+          if (!priceId) {
+            const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
+            priceId = lineItems.data[0]?.price?.id;
+          }
+          console.log(`💳 One-time payment priceId: ${priceId}`);
 
           // Emergency Pack - adds credits, doesn't change plan
           if (priceId === ONE_TIME_PACKS.EMERGENCY_PACK) {
@@ -128,7 +136,42 @@ export async function POST(request: NextRequest) {
             stripe_customer_id: session.customer as string,
           });
         }
-        // Subscription will be handled by customer.subscription.created
+
+        // For subscriptions, also update immediately (don't wait for subscription.created)
+        if (session.mode === 'subscription' && planType) {
+          console.log(`📦 Subscription checkout - updating plan to: ${planType}`);
+          
+          // Map planType to plan name
+          const planMap: Record<string, string> = {
+            'community': 'community',
+            'self_defender': 'self_defender',
+            'mission_partner': 'mission_partner',
+            'business': 'business',
+          };
+          
+          const plan = planMap[planType];
+          if (plan) {
+            // Update profiles table directly for immediate effect
+            await supabase
+              .from('profiles')
+              .update({
+                plan,
+                plan_updated_at: new Date().toISOString(),
+              })
+              .eq('id', userId);
+            
+            // Also update subscription status
+            await updateSubscriptionStatus(userId, {
+              has_active_subscription: true,
+              subscription_status: 'active',
+              current_plan: plan,
+              stripe_customer_id: session.customer as string,
+              stripe_price_id: priceIdFromMetadata || undefined,
+            });
+            
+            console.log(`✅ Plan updated to ${plan} for user ${userId}`);
+          }
+        }
         break;
       }
 

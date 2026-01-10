@@ -126,11 +126,13 @@ export async function POST(request: NextRequest) {
       metadata: {
         userId,
         planType,
+        priceId, // 🔥 CRITICAL: Webhook needs this to map to correct plan
       },
       subscription_data: isOneTime ? undefined : {
         metadata: {
           userId,
           planType,
+          priceId, // 🔥 CRITICAL: Also on subscription for renewal events
         },
       },
     });

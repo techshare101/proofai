@@ -15,13 +15,29 @@
 
 export const dynamic = 'force-dynamic';
 
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import supabase from '../lib/supabase';
 
 function SuccessContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('session_id');
+
+  // 🔥 CRITICAL: Force session refresh to pick up new plan
+  useEffect(() => {
+    async function refreshSession() {
+      try {
+        // Refresh the auth session to ensure latest user data
+        await supabase.auth.refreshSession();
+        console.log('✅ Session refreshed after successful checkout');
+      } catch (error) {
+        console.error('Error refreshing session:', error);
+      }
+    }
+    
+    refreshSession();
+  }, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-4">
