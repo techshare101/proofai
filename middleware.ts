@@ -34,16 +34,23 @@ const LEGACY_ROUTES = [
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // ✅ Allow /success page (Stripe redirects here) - NO AUTH CHECK
+  if (pathname === '/success') {
+    return NextResponse.next();
+  }
+
+  // 🔄 Redirect old checkout success path to new /success
+  if (pathname.startsWith('/checkout/success')) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/success';
+    return NextResponse.redirect(url);
+  }
+
   // ❌ Block legacy routes - redirect to /dashboard
   if (LEGACY_ROUTES.some(route => pathname.startsWith(route))) {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';
     return NextResponse.redirect(url);
-  }
-
-  // Allow public checkout pages (Stripe redirects here)
-  if (pathname === '/checkout/success' || pathname === '/checkout/cancel') {
-    return NextResponse.next();
   }
 
   // Check if this is a protected route (including /checkout but not success/cancel)
@@ -113,6 +120,7 @@ export const config = {
     '/recorder/:path*',
     '/checkout',
     '/checkout/:path*',
+    '/success',
     '/record/:path*',
     '/record-old/:path*',
     '/recorder-pro/:path*',
