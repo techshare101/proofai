@@ -49,6 +49,13 @@ export default function ReportCard({ report, onView, onDelete, onMove, folders =
   const [isDeleting, setIsDeleting] = useState(false)
   const [showMoveDropdown, setShowMoveDropdown] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  
+  // Debug: log folders when dropdown opens
+  const handleMoveClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    console.log('📁 Move button clicked, folders:', folders)
+    setShowMoveDropdown(!showMoveDropdown)
+  }
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -189,10 +196,7 @@ export default function ReportCard({ report, onView, onDelete, onMove, folders =
         {/* Move Button with Dropdown */}
         <div className="relative" ref={dropdownRef}>
           <button 
-            onClick={(e) => {
-              e.stopPropagation()
-              setShowMoveDropdown(!showMoveDropdown)
-            }}
+            onClick={handleMoveClick}
             className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-lg border text-orange-600 border-orange-200 bg-orange-50 hover:bg-orange-100"
           >
             <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
