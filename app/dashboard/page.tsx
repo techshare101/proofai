@@ -1,3 +1,10 @@
+/**
+ * 🔒 DASHBOARD v3.0 - 2026-01-10
+ * Build ID: RADICAL-SWEEP-v3
+ * 
+ * This is the ONLY dashboard. If you see the old dashboard,
+ * Vercel is serving a stale deployment.
+ */
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -354,6 +361,8 @@ export default function DashboardPage() {
           <div>
             <h1 className="text-2xl font-bold">Your Reports</h1>
             <p className="text-gray-600">Manage and view your PDF reports</p>
+            {/* Build verification - remove after confirming deployment works */}
+            <p className="text-xs text-purple-500 font-mono">Build: RADICAL-SWEEP-v3 | {new Date().toISOString().split('T')[0]}</p>
           </div>
           
           {/* Plan Badge & Usage */}

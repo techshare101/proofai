@@ -1,5 +1,7 @@
 /**
- * 🔒 STRIPE SUCCESS PAGE
+ * 🔒 STRIPE SUCCESS PAGE - v3.0 - 2026-01-10
+ * Build ID: RADICAL-SWEEP-v3
+ * 
  * This page MUST:
  * - Never redirect to /
  * - Never use plan-based routing
