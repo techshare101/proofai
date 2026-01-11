@@ -77,6 +77,9 @@ export default function FolderSidebar({ userId, onReportDrop, className = '', ca
       setNewFolderName('')
       setIsCreating(false)
       
+      // Notify dashboard to refresh its folders list
+      window.dispatchEvent(new CustomEvent('foldersChanged'))
+      
     } catch (err: any) {
       console.error('Error creating folder:', err)
       setError('Failed to create folder')
@@ -161,6 +164,8 @@ export default function FolderSidebar({ userId, onReportDrop, className = '', ca
                       await deleteFolder(folder.id, userId);
                       // Re-fetch the folders list
                       await fetchFolders();
+                      // Notify dashboard to refresh its folders list
+                      window.dispatchEvent(new CustomEvent('foldersChanged'));
                       // If the active folder was deleted, reset to null
                       if (activeFolder === folder.id) {
                         setActiveFolder(null);

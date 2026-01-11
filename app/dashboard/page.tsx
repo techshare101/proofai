@@ -89,6 +89,17 @@ export default function DashboardPage() {
     setIsBrowser(true)
   }, [])
   
+  // Listen for folder changes from sidebar (create/delete)
+  useEffect(() => {
+    const handleFoldersChanged = () => {
+      console.log('📁 Folders changed event received, refetching...')
+      fetchFolders()
+    }
+    
+    window.addEventListener('foldersChanged', handleFoldersChanged)
+    return () => window.removeEventListener('foldersChanged', handleFoldersChanged)
+  }, [session?.user?.id])
+  
   const fetchReports = async () => {
     if (!session?.user?.id) return
     
