@@ -63,7 +63,10 @@ export default function DashboardPage() {
   
   // Fetch user's folders
   const fetchFolders = async () => {
-    if (!session?.user?.id) return
+    if (!session?.user?.id) {
+      console.log('📁 fetchFolders: No user ID, skipping')
+      return
+    }
     
     try {
       console.log('📁 Fetching folders for user:', session.user.id)
@@ -77,7 +80,7 @@ export default function DashboardPage() {
         console.error('❌ Error fetching folders:', error)
         throw error
       }
-      console.log('📁 Folders fetched:', data)
+      console.log('📁 Folders fetched successfully:', data?.length, 'folders:', data)
       setFolders(data || [])
     } catch (err) {
       console.error('Error fetching folders:', err)
@@ -91,9 +94,20 @@ export default function DashboardPage() {
   
   // Listen for folder changes from sidebar (create/delete)
   useEffect(() => {
-    const handleFoldersChanged = () => {
+    const handleFoldersChanged = async () => {
       console.log('📁 Folders changed event received, refetching...')
-      fetchFolders()
+      if (!session?.user?.id) return
+      
+      const { data, error } = await supabase
+        .from('folders')
+        .select('id, name')
+        .eq('user_id', session.user.id)
+        .order('name')
+      
+      if (!error && data) {
+        console.log('📁 Folders refetched via event:', data)
+        setFolders(data)
+      }
     }
     
     window.addEventListener('foldersChanged', handleFoldersChanged)
