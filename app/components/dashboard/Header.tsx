@@ -4,12 +4,15 @@ import { User } from '@supabase/supabase-js'
 import supabase from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { useUserPlan } from '../../hooks/useUserPlan'
 
 interface HeaderProps {
   user: User | null
 }
 
 export default function Header({ user }: HeaderProps) {
+  const { plan } = useUserPlan()
+  const planType = plan.plan // Extract plan type string from UserPlan object
   const router = useRouter()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
 
@@ -36,6 +39,12 @@ export default function Header({ user }: HeaderProps) {
 
           {/* User info and logout */}
           <div className="flex items-center space-x-4">
+            {/* Mission Partner Badge */}
+            {planType === 'mission_partner' && (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                🌍 Mission Partner
+              </span>
+            )}
             {user && (
               <div className="text-sm text-gray-700">
                 {user.email}
