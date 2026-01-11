@@ -573,7 +573,7 @@ export default function DashboardPage() {
                         {new Date(report.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-4 py-3 text-sm">
-                        <div className="flex space-x-2">
+                        <div className="flex space-x-2 items-center">
                           <button
                             onClick={() => window.open(report.pdf_url, '_blank')}
                             className="text-blue-600 hover:text-blue-800"
@@ -586,6 +586,35 @@ export default function DashboardPage() {
                           >
                             Delete
                           </button>
+                          {/* Move dropdown for table view */}
+                          <div className="relative group">
+                            <button className="text-orange-600 hover:text-orange-800">
+                              Move ▾
+                            </button>
+                            <div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-20 hidden group-hover:block">
+                              <div className="py-1">
+                                <button
+                                  onClick={() => handleMoveReport(report.id, null)}
+                                  className={`w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 ${
+                                    report.folder_id === null ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                                  }`}
+                                >
+                                  📁 Uncategorized
+                                </button>
+                                {folders.map((folder) => (
+                                  <button
+                                    key={folder.id}
+                                    onClick={() => handleMoveReport(report.id, folder.id)}
+                                    className={`w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 ${
+                                      report.folder_id === folder.id ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                                    }`}
+                                  >
+                                    📁 {folder.name}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </td>
                     </tr>
