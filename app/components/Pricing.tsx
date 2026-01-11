@@ -115,7 +115,6 @@ export default function Pricing() {
     },
     {
       name: '🌍 Mission Partner',
-      badge: '⚖️ Court-Ready Priority',
       planType: 'mission_partner',
       price: '$19.99',
       period: 'mo',
@@ -128,6 +127,22 @@ export default function Pricing() {
         'Community recognition'
       ],
       buttonText: 'Become a Partner',
+      highlight: false
+    },
+    {
+      name: '⚖️ Court Certification',
+      planType: 'court_certification',
+      price: '$150',
+      period: 'one-time',
+      description: 'Legal-grade certification for court submissions',
+      features: [
+        'Court-ready PDF exports',
+        'Legal attestation layer',
+        'Tamper-proof certification',
+        'Chain of custody documentation',
+        'Expert witness support'
+      ],
+      buttonText: 'Get Certified',
       highlight: false
     }
   ];
@@ -153,13 +168,8 @@ export default function Pricing() {
               }`}
             >
               <div className="px-6 py-8 bg-white sm:p-10">
-                <h3 className="text-2xl font-medium text-gray-900 flex items-center gap-2">
+                <h3 className="text-2xl font-medium text-gray-900">
                   {tier.name}
-                  {tier.badge && (
-                    <span className="text-xs font-medium bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
-                      {tier.badge}
-                    </span>
-                  )}
                 </h3>
                 <div className="mt-4 flex items-baseline text-6xl font-extrabold">
                   {tier.price}
