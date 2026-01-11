@@ -69,6 +69,9 @@ async function generatePdfWithRetry(data: {
       
       // Create the request object for PDF generation with the videoUrl
       // integrated at every possible level to ensure it makes it through
+      // Get user's timezone for correct time display in PDF
+      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Chicago';
+      
       const pdfPath = await ClientPDFService.generatePDFReport({
         summary: formattedSummary,
         transcript: data.transcript,
@@ -78,7 +81,8 @@ async function generatePdfWithRetry(data: {
         caseId: `CASE-${Date.now()}`,
         reportDate: new Date().toISOString(),
         // RADICAL FIX: Add videoUrl at top level too
-        videoUrl: videoUrl 
+        videoUrl: videoUrl,
+        timezone: userTimezone
       }, {
         watermark: false,
         confidential: true,

@@ -26,6 +26,7 @@ interface PolishedPDFInput {
   includeSignature?: boolean; // Whether to include the signature placeholder
   transcript?: string; // Added to fix compatibility issues
   language?: string; // Language of the transcript
+  timezone?: string; // User's timezone (e.g., 'America/Chicago')
 }
 
 /**
@@ -246,6 +247,7 @@ export async function generatePolishedPDF(options: PolishedPDFInput): Promise<Bl
   drawLabeledField('Case ID', caseId, '#993300', true); // Use true for bold
   
   // Format the date in the same style as the screenshot - "M/D/YYYY, h:mm:ss AM/PM"
+  // Use user's timezone if provided, otherwise try to detect or use UTC
   let formattedDate = 'Unspecified';
   if (options.reportDate) {
     try {
@@ -253,8 +255,12 @@ export async function generatePolishedPDF(options: PolishedPDFInput): Promise<Bl
         ? options.reportDate 
         : new Date(options.reportDate);
       
-      // Format to match screenshot (6/14/2025, 11:27:25 AM)
+      // Use provided timezone or default to America/Chicago (Central Time)
+      const timezone = options.timezone || 'America/Chicago';
+      
+      // Format to match screenshot (6/14/2025, 11:27:25 AM) with correct timezone
       formattedDate = reportDate.toLocaleString('en-US', {
+        timeZone: timezone,
         month: 'numeric',
         day: 'numeric',
         year: 'numeric',

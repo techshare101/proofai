@@ -136,7 +136,8 @@ export async function generatePDF(request: PdfRequest): Promise<Uint8Array> {
       relevance: legalRelevance,
       legalRelevance,
       includeSignature: options.includeSignature,
-      reportPublicUrl: reportPublicUrl
+      reportPublicUrl: reportPublicUrl,
+      timezone: structuredSummary?.timezone || 'America/Chicago'
     });
     
     // Convert Blob to Uint8Array for compatibility with existing code

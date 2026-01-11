@@ -40,6 +40,7 @@ export interface StructuredSummary {
   publicUrl?: string; // Public URL for verification QR code
   lat?: number; // Latitude for location
   lng?: number; // Longitude for location
+  timezone?: string; // User's timezone for correct time display (e.g., 'America/Chicago')
 }
 
 export interface PdfGenerationOptions {
