@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 export default function Footer() {
   const currentYear = new Date().getFullYear();
 
@@ -37,24 +39,24 @@ export default function Footer() {
             <h3 className="text-sm font-semibold uppercase tracking-wider">Resources</h3>
             <ul className="mt-4 space-y-4">
               <li>
-                <a href="#" className="text-base text-gray-400 hover:text-white">
+                <Link href="/help" className="text-base text-gray-400 hover:text-white">
                   Help Center
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="text-base text-gray-400 hover:text-white">
+                <Link href="/docs" className="text-base text-gray-400 hover:text-white">
                   Documentation
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="text-base text-gray-400 hover:text-white">
+                <Link href="/tutorials" className="text-base text-gray-400 hover:text-white">
                   Tutorials
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="text-base text-gray-400 hover:text-white">
+                <Link href="/blog" className="text-base text-gray-400 hover:text-white">
                   Blog
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
@@ -64,24 +66,24 @@ export default function Footer() {
             <h3 className="text-sm font-semibold uppercase tracking-wider">Legal</h3>
             <ul className="mt-4 space-y-4">
               <li>
-                <a href="#" className="text-base text-gray-400 hover:text-white">
+                <Link href="/terms" className="text-base text-gray-400 hover:text-white">
                   Terms of Service
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="text-base text-gray-400 hover:text-white">
+                <Link href="/privacy" className="text-base text-gray-400 hover:text-white">
                   Privacy Policy
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="text-base text-gray-400 hover:text-white">
+                <Link href="/cookies" className="text-base text-gray-400 hover:text-white">
                   Cookie Policy
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="text-base text-gray-400 hover:text-white">
+                <Link href="/contact" className="text-base text-gray-400 hover:text-white">
                   Contact
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
@@ -94,7 +96,7 @@ export default function Footer() {
               ❤️ Built with love by volunteers.
             </p>
             <p>
-              &copy; {currentYear} ProofAI. All rights reserved MetalMindTech.
+              &copy; {currentYear} ProofAI. All rights reserved MetalMindTech. kojo and Kesarel
             </p>
           </div>
         </div>
