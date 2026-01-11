@@ -496,6 +496,8 @@ export default function DashboardPage() {
                     report={report}
                     onView={(report) => window.open(report.pdf_url, '_blank')}
                     onDelete={handleDeleteReport}
+                    onMove={handleMoveReport}
+                    folders={folders}
                   />
                 ))}
               </div>
