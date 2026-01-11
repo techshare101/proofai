@@ -115,6 +115,7 @@ export default function Pricing() {
     },
     {
       name: '🌍 Mission Partner',
+      badge: '⚖️ Court-Ready Priority',
       planType: 'mission_partner',
       price: '$19.99',
       period: 'mo',
@@ -152,14 +153,25 @@ export default function Pricing() {
               }`}
             >
               <div className="px-6 py-8 bg-white sm:p-10">
-                <h3 className="text-2xl font-medium text-gray-900">
+                <h3 className="text-2xl font-medium text-gray-900 flex items-center gap-2">
                   {tier.name}
+                  {tier.badge && (
+                    <span className="text-xs font-medium bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+                      {tier.badge}
+                    </span>
+                  )}
                 </h3>
                 <div className="mt-4 flex items-baseline text-6xl font-extrabold">
                   {tier.price}
-                  <span className="ml-1 text-2xl font-medium text-gray-500">
-                    /mo
-                  </span>
+                  {tier.period === 'one-time' ? (
+                    <span className="ml-2 text-base font-medium text-gray-500">
+                      one-time
+                    </span>
+                  ) : (
+                    <span className="ml-1 text-2xl font-medium text-gray-500">
+                      /mo
+                    </span>
+                  )}
                 </div>
                 <p className="mt-5 text-lg text-gray-500">
                   {tier.description}
