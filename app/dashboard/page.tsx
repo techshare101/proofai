@@ -66,13 +66,11 @@ export default function DashboardPage() {
     checkAdmin()
   }, [session])
 
-  // Fetch reports and folders when session changes
+  // Fetch reports and folders when session changes or folder selection changes
   useEffect(() => {
     if (session?.user) {
       fetchFolders() // Always fetch folders
-      if (!activeFolder) {
-        fetchReports()
-      }
+      fetchReports() // Fetch reports (filtered by activeFolder if set)
     }
   }, [session, activeFolder])
   
@@ -128,6 +126,17 @@ export default function DashboardPage() {
     window.addEventListener('foldersChanged', handleFoldersChanged)
     return () => window.removeEventListener('foldersChanged', handleFoldersChanged)
   }, [session?.user?.id])
+  
+  // Listen for folder selection from sidebar
+  useEffect(() => {
+    const handleFolderChange = (event: CustomEvent<{ folderId: string | null }>) => {
+      console.log('📁 Folder selected:', event.detail.folderId)
+      setActiveFolder(event.detail.folderId)
+    }
+    
+    window.addEventListener('folderChange', handleFolderChange as EventListener)
+    return () => window.removeEventListener('folderChange', handleFolderChange as EventListener)
+  }, [])
   
   const fetchReports = async () => {
     if (!session?.user?.id) return
@@ -508,8 +517,37 @@ export default function DashboardPage() {
         <div className="bg-red-50 p-4 rounded-md">
           <p className="text-red-600">{error}</p>
         </div>
-      ) : !activeFolder ? (
+      ) : (
         <>
+          {/* Folder header when viewing a specific folder */}
+          {activeFolder && (
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={() => setActiveFolder(null)}
+                  className="text-blue-600 hover:text-blue-800 flex items-center"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  All Reports
+                </button>
+                <span className="text-gray-400">/</span>
+                <div className="flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                  </svg>
+                  <span className="font-semibold text-gray-800">
+                    {folders.find(f => f.id === activeFolder)?.name || 'Folder'}
+                  </span>
+                  <span className="ml-2 text-sm text-gray-500">
+                    ({filteredReports.length} {filteredReports.length === 1 ? 'report' : 'reports'})
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-end mb-4">
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-600">View:</span>
@@ -534,10 +572,10 @@ export default function DashboardPage() {
             </div>
           ) : filteredReports.length === 0 ? (
             <EmptyState 
-              title="No reports found" 
-              message={searchQuery ? "No reports match your search" : "You haven't added any reports yet. Ready to create your first proof?"}
+              title={activeFolder ? "No reports in this folder" : "No reports found"}
+              message={searchQuery ? "No reports match your search" : activeFolder ? "Move reports here or create a new recording" : "You haven't added any reports yet. Ready to create your first proof?"}
               showUploadOption={true}
-              folderName={null}
+              folderName={activeFolder ? folders.find(f => f.id === activeFolder)?.name : null}
             />
           ) : cardView ? (
             activeFolder ? (
@@ -652,11 +690,6 @@ export default function DashboardPage() {
             </div>
           )}
         </>
-      ) : (
-        <div className="p-5">
-          <h2 className="text-xl font-semibold mb-4">Reports</h2>
-          <ReportList folderId={activeFolder} />
-        </div>
       )}
         </div>
       </div>
