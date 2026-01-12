@@ -55,6 +55,15 @@ export default function AdminDashboard() {
   const [impersonateEmail, setImpersonateEmail] = useState('');
   const [impersonateLoading, setImpersonateLoading] = useState(false);
   const [impersonateMessage, setImpersonateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  
+  // Create user form states
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserRole, setNewUserRole] = useState('user');
+  const [newUserPlan, setNewUserPlan] = useState('starter');
+  const [createUserLoading, setCreateUserLoading] = useState(false);
+  const [createUserMessage, setCreateUserMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const getAuthToken = async () => {
     const { data } = await supabase.auth.getSession();
@@ -160,6 +169,47 @@ export default function AdminDashboard() {
       setImpersonateMessage({ type: 'error', text: 'An error occurred' });
     } finally {
       setImpersonateLoading(false);
+    }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreateUserLoading(true);
+    setCreateUserMessage(null);
+    
+    try {
+      const token = await getAuthToken();
+      const response = await fetch('/api/admin/create-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          email: newUserEmail,
+          password: newUserPassword,
+          role: newUserRole,
+          plan: newUserPlan,
+        }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setCreateUserMessage({ type: 'success', text: `User ${data.email} created successfully!` });
+        setNewUserEmail('');
+        setNewUserPassword('');
+        setNewUserRole('user');
+        setNewUserPlan('starter');
+        // Refresh users list
+        window.location.reload();
+      } else {
+        const data = await response.json();
+        setCreateUserMessage({ type: 'error', text: data.error || 'Failed to create user' });
+      }
+    } catch (error) {
+      setCreateUserMessage({ type: 'error', text: 'An error occurred' });
+    } finally {
+      setCreateUserLoading(false);
     }
   };
 
@@ -355,10 +405,93 @@ export default function AdminDashboard() {
           )}
 
           {activeTab === 'users' && (
-            <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
-              <div className="p-6 border-b border-gray-700">
-                <h2 className="text-xl font-semibold text-white">User Management</h2>
+            <div className="space-y-6">
+              {/* Add User Button & Form */}
+              <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold text-white">User Management</h2>
+                  <button
+                    onClick={() => setShowCreateUser(!showCreateUser)}
+                    className="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors"
+                  >
+                    {showCreateUser ? '✕ Cancel' : '+ Add User'}
+                  </button>
+                </div>
+                
+                {showCreateUser && (
+                  <div className="mt-4 p-4 bg-gray-750 rounded-lg border border-gray-600">
+                    <h3 className="text-lg font-medium text-white mb-4">Create New User</h3>
+                    {createUserMessage && (
+                      <div className={`mb-4 p-3 rounded-lg ${createUserMessage.type === 'success' ? 'bg-green-900/50 border border-green-700 text-green-300' : 'bg-red-900/50 border border-red-700 text-red-300'}`}>
+                        {createUserMessage.text}
+                      </div>
+                    )}
+                    <form onSubmit={handleCreateUser} className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-1">Email</label>
+                          <input
+                            type="email"
+                            value={newUserEmail}
+                            onChange={(e) => setNewUserEmail(e.target.value)}
+                            required
+                            placeholder="user@example.com"
+                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-1">Password</label>
+                          <input
+                            type="password"
+                            value={newUserPassword}
+                            onChange={(e) => setNewUserPassword(e.target.value)}
+                            required
+                            placeholder="••••••••"
+                            minLength={6}
+                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-1">Role</label>
+                          <select
+                            value={newUserRole}
+                            onChange={(e) => setNewUserRole(e.target.value)}
+                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                          >
+                            <option value="user">User</option>
+                            <option value="support">Support</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-1">Plan</label>
+                          <select
+                            value={newUserPlan}
+                            onChange={(e) => setNewUserPlan(e.target.value)}
+                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                          >
+                            <option value="starter">Starter (Free)</option>
+                            <option value="community">Community</option>
+                            <option value="self_defender">Self-Defender</option>
+                            <option value="mission_partner">Mission Partner</option>
+                            <option value="lifetime">Lifetime (Unlimited)</option>
+                          </select>
+                        </div>
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={createUserLoading}
+                        className="bg-green-600 hover:bg-green-700 disabled:bg-green-800 disabled:cursor-not-allowed text-white font-semibold px-6 py-2 rounded-lg transition-colors"
+                      >
+                        {createUserLoading ? 'Creating...' : 'Create User'}
+                      </button>
+                    </form>
+                  </div>
+                )}
               </div>
+
+              {/* Users Table */}
+              <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-750">
@@ -407,6 +540,7 @@ export default function AdminDashboard() {
                     ))}
                   </tbody>
                 </table>
+              </div>
               </div>
             </div>
           )}
