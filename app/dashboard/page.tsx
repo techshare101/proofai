@@ -41,6 +41,7 @@ export default function DashboardPage() {
   const [dateFilter, setDateFilter] = useState('all')
   const [activeFolder, setActiveFolder] = useState<string | null>(null)
   const [dragFeedback, setDragFeedback] = useState<{message: string, type: 'success' | 'error'} | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   
   // Set up DnD sensors
   const sensors = useSensors(
@@ -50,6 +51,20 @@ export default function DashboardPage() {
       },
     })
   )
+
+  // Check if user is admin
+  useEffect(() => {
+    async function checkAdmin() {
+      if (!session?.user?.id) return
+      const { data } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single()
+      setIsAdmin(data?.role === 'admin')
+    }
+    checkAdmin()
+  }, [session])
 
   // Fetch reports and folders when session changes
   useEffect(() => {
@@ -392,6 +407,16 @@ export default function DashboardPage() {
           
           {/* Plan Badge & Usage */}
           <div className="flex items-center gap-4">
+            {/* Admin Link */}
+            {isAdmin && (
+              <Link 
+                href="/admin"
+                className="px-3 py-1 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition flex items-center gap-1"
+              >
+                🛡️ Admin
+              </Link>
+            )}
+            
             {/* Recording Usage */}
             {!isUnlimited && (
               <div className="text-sm text-gray-600">
@@ -410,7 +435,6 @@ export default function DashboardPage() {
               {isDevBypass ? '🔧 Dev Mode' : plan.plan === 'starter' ? '🕊️ Starter' : 
                plan.plan === 'community' ? '🤝 Community' :
                plan.plan === 'self_defender' ? '🛡️ Self-Defender' :
-               plan.plan === 'emergency_pack' ? '🚨 Emergency' :
                plan.plan === 'mission_partner' ? '🌍 Partner' : plan.plan}
             </div>
             
