@@ -12,7 +12,8 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import supabase from '../../lib/supabase';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
 export async function GET(request: Request) {
   try {
@@ -26,6 +27,25 @@ export async function GET(request: Request) {
       console.error('No code in callback');
       return NextResponse.redirect(`${requestUrl.origin}/login?error=no_code`);
     }
+
+    // Create server-side Supabase client with cookie handling
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options);
+            });
+          },
+        },
+      }
+    );
 
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 

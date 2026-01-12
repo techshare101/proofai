@@ -1,21 +1,60 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import supabase from '../lib/supabase';
+import { createBrowserClient } from '@supabase/ssr';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 export default function SignUpPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
+
+  useEffect(() => {
+    const client = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    setSupabase(client);
+  }, []);
+
+  // Google OAuth sign up
+  const handleGoogleSignUp = async () => {
+    if (!supabase) return;
+    try {
+      setGoogleLoading(true);
+      setError('');
+      
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
+        (typeof window !== 'undefined' ? window.location.origin : 'https://proofai-prod.vercel.app');
+      const redirectUrl = `${baseUrl}/auth/callback?return_to=/dashboard`;
+      
+      console.log('🔐 Google OAuth redirect URL:', redirectUrl);
+      
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+        },
+      });
+
+      if (error) throw error;
+    } catch (err: any) {
+      setError(err.message || 'Failed to sign up with Google');
+      setGoogleLoading(false);
+    }
+  };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!supabase) return;
     
     // Validate passwords match
     if (password !== confirmPassword) {
@@ -80,7 +119,32 @@ export default function SignUpPage() {
           </div>
         )}
 
-        <form className="mt-8 space-y-6" onSubmit={handleSignUp}>
+        {/* Google Sign Up Button */}
+        <button
+          onClick={handleGoogleSignUp}
+          disabled={googleLoading}
+          className="w-full flex items-center justify-center gap-3 border border-gray-300 rounded-lg px-4 py-2.5 text-sm font-medium bg-white hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {googleLoading ? (
+            <svg className="animate-spin h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 48 48">
+              <path fill="#EA4335" d="M24 9.5c3.1 0 5.9 1.1 8.1 2.9l6-6C34.3 2.4 29.5 0 24 0 14.6 0 6.6 5.4 2.7 13.2l7.2 5.6C12 13.1 17.5 9.5 24 9.5z"/>
+              <path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-2.8-.4-4.1H24v7.7h12.6c-.6 3.1-2.4 5.7-5.1 7.4l7.8 6c4.6-4.2 7.8-10.4 7.8-17z"/>
+              <path fill="#FBBC05" d="M9.9 28.8c-1-3.1-1-6.4 0-9.5l-7.2-5.6c-3.1 6.2-3.1 14.4 0 20.6l7.2-5.5z"/>
+              <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.8-6c-2.2 1.5-5 2.4-8.1 2.4-6.5 0-12-3.6-14.1-8.9l-7.2 5.5C6.6 42.6 14.6 48 24 48z"/>
+            </svg>
+          )}
+          {googleLoading ? 'Signing up...' : 'Continue with Google'}
+        </button>
+
+        {/* Divider */}
+        <div className="my-4 text-center text-xs text-gray-500">or</div>
+
+        <form className="space-y-6" onSubmit={handleSignUp}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <label htmlFor="email-address" className="sr-only">
