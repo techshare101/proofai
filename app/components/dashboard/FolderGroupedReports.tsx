@@ -29,12 +29,26 @@ export default function FolderGroupedReports({
   folders = []
 }: FolderGroupedReportsProps) {
   // Group reports by folder
-  const initialGroups = groupReportsByFolder(reports)
-  const [folderGroups, setFolderGroups] = useState<FolderGroup[]>(initialGroups)
+  const [folderGroups, setFolderGroups] = useState<FolderGroup[]>([])
   const [isInitialLoad, setIsInitialLoad] = useState(true)
   
   // Track touch start position for swipe gestures
   const [touchStart, setTouchStart] = useState<{x: number, y: number} | null>(null)
+  
+  // Update folder groups when reports change (e.g., after move)
+  useEffect(() => {
+    const newGroups = groupReportsByFolder(reports)
+    // Preserve expanded state from previous groups
+    setFolderGroups(prevGroups => {
+      return newGroups.map(newGroup => {
+        const prevGroup = prevGroups.find(g => g.folderId === newGroup.folderId)
+        return {
+          ...newGroup,
+          isExpanded: prevGroup?.isExpanded ?? true // Default to expanded for new folders
+        }
+      })
+    })
+  }, [reports])
   
   // Set initial load to false after component mounts
   useEffect(() => {

@@ -317,16 +317,20 @@ export default function DashboardPage() {
           
         if (error) throw error;
         
-        // Update local state
+        // Find the folder name for UI update
+        const targetFolder = folders.find(f => f.id === folderId);
+        const folderName = targetFolder?.name || 'Uncategorized';
+        
+        // Update local state with both folder_id AND folder_name
         setReports(reports.map(report => {
           if (report.id === reportId) {
-            return { ...report, folder_id: folderId };
+            return { ...report, folder_id: folderId, folder_name: folderName };
           }
           return report;
         }));
         
         setDragFeedback({
-          message: 'Report moved successfully!',
+          message: `Moved to ${folderName}!`,
           type: 'success'
         });
         
